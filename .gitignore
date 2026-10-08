@@ -1,0 +1,14 @@
+# secrets
+.env
+# builds and local data
+.build/
+.local/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+web/node_modules/
+# web/dist is committed on purpose: deploy.py uploads it, so deploying needs no Node
+.DS_Store
+# generated report artifacts
+rpt*.pdf
