@@ -1,0 +1,13 @@
+# Exact packages of the 'geo' Lambda layer for Python 3.12 on x86_64 Linux (resolved from geo.txt).
+# deploy.py downloads these with --no-deps, so the build does not depend on the Python version doing the build.
+affine==3.0.1
+attrs==26.1.0
+certifi==2026.7.22
+click==8.5.0
+click-plugins==1.1.1.2
+cligj==0.7.2
+numpy==2.2.6
+pillow==12.3.0
+pyparsing==3.3.3
+rasterio==1.4.3
+shapely==2.2.0

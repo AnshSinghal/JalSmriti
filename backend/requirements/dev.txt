@@ -1,0 +1,6 @@
+# Local development and tests (Python 3.12)
+-r geo.txt
+-r app.txt
+pytest
+moto[dynamodb,s3,sns,sqs,kms,cognitoidp,ssm,server]==5.*
+cfn-lint

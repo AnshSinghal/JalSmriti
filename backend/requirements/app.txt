@@ -1,0 +1,10 @@
+# Lambda layer "app" (Python 3.12, x86_64). Built by deploy.py with pip download --platform manylinux.
+aws-lambda-powertools==3.35.0
+cedarpy==4.12.1
+strands-agents==1.59.0
+fpdf2==2.8.9
+uharfbuzz==0.56.3
+segno==1.6.6
+cryptography==50.0.2
+pillow==12.3.0
+boto3==1.43.111

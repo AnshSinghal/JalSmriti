@@ -1,0 +1,5 @@
+# Lambda layer "geo" (Python 3.12, x86_64). Built by deploy.py with pip download --platform manylinux.
+rasterio==1.4.3
+numpy==2.2.6
+shapely==2.2.0
+pillow==12.3.0
