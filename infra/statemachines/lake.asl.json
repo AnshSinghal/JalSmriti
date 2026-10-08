@@ -1,0 +1,311 @@
+{
+ "Comment": "Any water body on demand: find it, read 40 years of looks, land cover, rain and the latest look, then grade it.",
+ "StartAt": "Find",
+ "States": {
+  "Find": {
+   "Type": "Task",
+   "Resource": "arn:aws:states:::lambda:invoke",
+   "Parameters": {
+    "FunctionName": "${GeoFnArn}",
+    "Payload": {
+     "task": "lake.find",
+     "jobId.$": "$.jobId",
+     "lat.$": "$.lat",
+     "lon.$": "$.lon"
+    }
+   },
+   "ResultSelector": {
+    "done.$": "$.Payload.done",
+    "lakeId.$": "$.Payload.lakeId"
+   },
+   "ResultPath": "$.found",
+   "Retry": [
+    {
+     "ErrorEquals": [
+      "Lambda.TooManyRequestsException",
+      "Lambda.ServiceException",
+      "Lambda.AWSLambdaException",
+      "Lambda.SdkClientException",
+      "Lambda.ClientExecutionTimeoutException"
+     ],
+     "IntervalSeconds": 8,
+     "MaxAttempts": 8,
+     "BackoffRate": 2,
+     "MaxDelaySeconds": 120,
+     "JitterStrategy": "FULL"
+    },
+    {
+     "ErrorEquals": [
+      "States.TaskFailed"
+     ],
+     "IntervalSeconds": 15,
+     "MaxAttempts": 2,
+     "BackoffRate": 2
+    }
+   ],
+   "Catch": [
+    {
+     "ErrorEquals": [
+      "States.ALL"
+     ],
+     "ResultPath": "$.error",
+     "Next": "Failed"
+    }
+   ],
+   "Next": "Known"
+  },
+  "Known": {
+   "Type": "Choice",
+   "Choices": [
+    {
+     "Variable": "$.found.done",
+     "BooleanEquals": true,
+     "Next": "Finished"
+    }
+   ],
+   "Default": "Analyse"
+  },
+  "Analyse": {
+   "Type": "Parallel",
+   "ResultPath": null,
+   "Next": "Aggregate",
+   "Catch": [
+    {
+     "ErrorEquals": [
+      "States.ALL"
+     ],
+     "ResultPath": "$.error",
+     "Next": "Failed"
+    }
+   ],
+   "Branches": [
+    {
+     "StartAt": "Looks",
+     "States": {
+      "Looks": {
+       "Type": "Task",
+       "Resource": "arn:aws:states:::lambda:invoke",
+       "Parameters": {
+        "FunctionName": "${GeoFnArn}",
+        "Payload": {
+         "task": "lake.looks",
+         "lakeId.$": "$.found.lakeId",
+         "jobId.$": "$.jobId"
+        }
+       },
+       "ResultPath": null,
+       "Retry": [
+        {
+         "ErrorEquals": [
+          "Lambda.TooManyRequestsException",
+          "Lambda.ServiceException",
+          "Lambda.AWSLambdaException",
+          "Lambda.SdkClientException",
+          "Lambda.ClientExecutionTimeoutException"
+         ],
+         "IntervalSeconds": 8,
+         "MaxAttempts": 8,
+         "BackoffRate": 2,
+         "MaxDelaySeconds": 120,
+         "JitterStrategy": "FULL"
+        },
+        {
+         "ErrorEquals": [
+          "States.TaskFailed"
+         ],
+         "IntervalSeconds": 15,
+         "MaxAttempts": 2,
+         "BackoffRate": 2
+        }
+       ],
+       "End": true
+      }
+     }
+    },
+    {
+     "StartAt": "Static",
+     "States": {
+      "Static": {
+       "Type": "Task",
+       "Resource": "arn:aws:states:::lambda:invoke",
+       "Parameters": {
+        "FunctionName": "${GeoFnArn}",
+        "Payload": {
+         "task": "lake.static",
+         "lakeId.$": "$.found.lakeId",
+         "jobId.$": "$.jobId"
+        }
+       },
+       "ResultPath": null,
+       "Retry": [
+        {
+         "ErrorEquals": [
+          "Lambda.TooManyRequestsException",
+          "Lambda.ServiceException",
+          "Lambda.AWSLambdaException",
+          "Lambda.SdkClientException",
+          "Lambda.ClientExecutionTimeoutException"
+         ],
+         "IntervalSeconds": 8,
+         "MaxAttempts": 8,
+         "BackoffRate": 2,
+         "MaxDelaySeconds": 120,
+         "JitterStrategy": "FULL"
+        },
+        {
+         "ErrorEquals": [
+          "States.TaskFailed"
+         ],
+         "IntervalSeconds": 15,
+         "MaxAttempts": 2,
+         "BackoffRate": 2
+        }
+       ],
+       "End": true
+      }
+     }
+    },
+    {
+     "StartAt": "Latest",
+     "States": {
+      "Latest": {
+       "Type": "Task",
+       "Resource": "arn:aws:states:::lambda:invoke",
+       "Parameters": {
+        "FunctionName": "${GeoFnArn}",
+        "Payload": {
+         "task": "lake.latest",
+         "lakeId.$": "$.found.lakeId",
+         "jobId.$": "$.jobId"
+        }
+       },
+       "ResultPath": null,
+       "Retry": [
+        {
+         "ErrorEquals": [
+          "Lambda.TooManyRequestsException",
+          "Lambda.ServiceException",
+          "Lambda.AWSLambdaException",
+          "Lambda.SdkClientException",
+          "Lambda.ClientExecutionTimeoutException"
+         ],
+         "IntervalSeconds": 8,
+         "MaxAttempts": 8,
+         "BackoffRate": 2,
+         "MaxDelaySeconds": 120,
+         "JitterStrategy": "FULL"
+        },
+        {
+         "ErrorEquals": [
+          "States.TaskFailed"
+         ],
+         "IntervalSeconds": 15,
+         "MaxAttempts": 2,
+         "BackoffRate": 2
+        }
+       ],
+       "Catch": [
+        {
+         "ErrorEquals": [
+          "States.ALL"
+         ],
+         "ResultPath": "$.error",
+         "Next": "LatestSkipped"
+        }
+       ],
+       "End": true
+      },
+      "LatestSkipped": {
+       "Type": "Pass",
+       "End": true
+      }
+     }
+    }
+   ]
+  },
+  "Aggregate": {
+   "Type": "Task",
+   "Resource": "arn:aws:states:::lambda:invoke",
+   "Parameters": {
+    "FunctionName": "${GeoFnArn}",
+    "Payload": {
+     "task": "lake.aggregate",
+     "lakeId.$": "$.found.lakeId",
+     "jobId.$": "$.jobId"
+    }
+   },
+   "ResultPath": null,
+   "Retry": [
+    {
+     "ErrorEquals": [
+      "Lambda.TooManyRequestsException",
+      "Lambda.ServiceException",
+      "Lambda.AWSLambdaException",
+      "Lambda.SdkClientException",
+      "Lambda.ClientExecutionTimeoutException"
+     ],
+     "IntervalSeconds": 8,
+     "MaxAttempts": 8,
+     "BackoffRate": 2,
+     "MaxDelaySeconds": 120,
+     "JitterStrategy": "FULL"
+    },
+    {
+     "ErrorEquals": [
+      "States.TaskFailed"
+     ],
+     "IntervalSeconds": 15,
+     "MaxAttempts": 2,
+     "BackoffRate": 2
+    }
+   ],
+   "Catch": [
+    {
+     "ErrorEquals": [
+      "States.ALL"
+     ],
+     "ResultPath": "$.error",
+     "Next": "Failed"
+    }
+   ],
+   "End": true
+  },
+  "Finished": {
+   "Type": "Succeed"
+  },
+  "Failed": {
+   "Type": "Task",
+   "Resource": "arn:aws:states:::lambda:invoke",
+   "Parameters": {
+    "FunctionName": "${GeoFnArn}",
+    "Payload": {
+     "task": "lake.failed",
+     "jobId.$": "$.jobId",
+     "error.$": "$.error"
+    }
+   },
+   "ResultPath": null,
+   "Next": "Fail",
+   "Retry": [
+    {
+     "ErrorEquals": [
+      "Lambda.TooManyRequestsException",
+      "Lambda.ServiceException",
+      "Lambda.AWSLambdaException",
+      "Lambda.SdkClientException",
+      "Lambda.ClientExecutionTimeoutException"
+     ],
+     "IntervalSeconds": 8,
+     "MaxAttempts": 10,
+     "BackoffRate": 2,
+     "MaxDelaySeconds": 120,
+     "JitterStrategy": "FULL"
+    }
+   ]
+  },
+  "Fail": {
+   "Type": "Fail",
+   "Error": "LakeAnalysisFailed"
+  }
+ }
+}

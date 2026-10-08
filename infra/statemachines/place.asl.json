@@ -1,0 +1,317 @@
+{
+ "Comment": "Place check: water history, land cover and terrain, time-lapse frames, radar sightings and summer heat, then the score.",
+ "StartAt": "Look",
+ "States": {
+  "Look": {
+   "Type": "Parallel",
+   "ResultPath": null,
+   "Next": "Score",
+   "Catch": [
+    {
+     "ErrorEquals": [
+      "States.ALL"
+     ],
+     "ResultPath": "$.error",
+     "Next": "Failed"
+    }
+   ],
+   "Branches": [
+    {
+     "StartAt": "Static",
+     "States": {
+      "Static": {
+       "Type": "Task",
+       "Resource": "arn:aws:states:::lambda:invoke",
+       "Parameters": {
+        "FunctionName": "${GeoFnArn}",
+        "Payload": {
+         "task": "place.static",
+         "jobId.$": "$.jobId",
+         "lat.$": "$.lat",
+         "lon.$": "$.lon"
+        }
+       },
+       "ResultPath": null,
+       "Retry": [
+        {
+         "ErrorEquals": [
+          "Lambda.TooManyRequestsException",
+          "Lambda.ServiceException",
+          "Lambda.AWSLambdaException",
+          "Lambda.SdkClientException",
+          "Lambda.ClientExecutionTimeoutException"
+         ],
+         "IntervalSeconds": 8,
+         "MaxAttempts": 8,
+         "BackoffRate": 2,
+         "MaxDelaySeconds": 120,
+         "JitterStrategy": "FULL"
+        },
+        {
+         "ErrorEquals": [
+          "States.TaskFailed"
+         ],
+         "IntervalSeconds": 15,
+         "MaxAttempts": 2,
+         "BackoffRate": 2
+        }
+       ],
+       "End": true
+      }
+     }
+    },
+    {
+     "StartAt": "Optical",
+     "States": {
+      "Optical": {
+       "Type": "Task",
+       "Resource": "arn:aws:states:::lambda:invoke",
+       "Parameters": {
+        "FunctionName": "${GeoFnArn}",
+        "Payload": {
+         "task": "place.optical",
+         "jobId.$": "$.jobId",
+         "lat.$": "$.lat",
+         "lon.$": "$.lon"
+        }
+       },
+       "ResultPath": null,
+       "Retry": [
+        {
+         "ErrorEquals": [
+          "Lambda.TooManyRequestsException",
+          "Lambda.ServiceException",
+          "Lambda.AWSLambdaException",
+          "Lambda.SdkClientException",
+          "Lambda.ClientExecutionTimeoutException"
+         ],
+         "IntervalSeconds": 8,
+         "MaxAttempts": 8,
+         "BackoffRate": 2,
+         "MaxDelaySeconds": 120,
+         "JitterStrategy": "FULL"
+        },
+        {
+         "ErrorEquals": [
+          "States.TaskFailed"
+         ],
+         "IntervalSeconds": 15,
+         "MaxAttempts": 2,
+         "BackoffRate": 2
+        }
+       ],
+       "Catch": [
+        {
+         "ErrorEquals": [
+          "States.ALL"
+         ],
+         "ResultPath": "$.error",
+         "Next": "OpticalSkipped"
+        }
+       ],
+       "End": true
+      },
+      "OpticalSkipped": {
+       "Type": "Pass",
+       "End": true
+      }
+     }
+    },
+    {
+     "StartAt": "Radar",
+     "States": {
+      "Radar": {
+       "Type": "Task",
+       "Resource": "arn:aws:states:::lambda:invoke",
+       "Parameters": {
+        "FunctionName": "${GeoFnArn}",
+        "Payload": {
+         "task": "place.radar",
+         "jobId.$": "$.jobId",
+         "lat.$": "$.lat",
+         "lon.$": "$.lon"
+        }
+       },
+       "ResultPath": null,
+       "Retry": [
+        {
+         "ErrorEquals": [
+          "Lambda.TooManyRequestsException",
+          "Lambda.ServiceException",
+          "Lambda.AWSLambdaException",
+          "Lambda.SdkClientException",
+          "Lambda.ClientExecutionTimeoutException"
+         ],
+         "IntervalSeconds": 8,
+         "MaxAttempts": 8,
+         "BackoffRate": 2,
+         "MaxDelaySeconds": 120,
+         "JitterStrategy": "FULL"
+        },
+        {
+         "ErrorEquals": [
+          "States.TaskFailed"
+         ],
+         "IntervalSeconds": 15,
+         "MaxAttempts": 2,
+         "BackoffRate": 2
+        }
+       ],
+       "Catch": [
+        {
+         "ErrorEquals": [
+          "States.ALL"
+         ],
+         "ResultPath": "$.error",
+         "Next": "RadarSkipped"
+        }
+       ],
+       "End": true
+      },
+      "RadarSkipped": {
+       "Type": "Pass",
+       "End": true
+      }
+     }
+    },
+    {
+     "StartAt": "Heat",
+     "States": {
+      "Heat": {
+       "Type": "Task",
+       "Resource": "arn:aws:states:::lambda:invoke",
+       "Parameters": {
+        "FunctionName": "${GeoFnArn}",
+        "Payload": {
+         "task": "place.heat",
+         "jobId.$": "$.jobId",
+         "lat.$": "$.lat",
+         "lon.$": "$.lon"
+        }
+       },
+       "ResultPath": null,
+       "Retry": [
+        {
+         "ErrorEquals": [
+          "Lambda.TooManyRequestsException",
+          "Lambda.ServiceException",
+          "Lambda.AWSLambdaException",
+          "Lambda.SdkClientException",
+          "Lambda.ClientExecutionTimeoutException"
+         ],
+         "IntervalSeconds": 8,
+         "MaxAttempts": 8,
+         "BackoffRate": 2,
+         "MaxDelaySeconds": 120,
+         "JitterStrategy": "FULL"
+        },
+        {
+         "ErrorEquals": [
+          "States.TaskFailed"
+         ],
+         "IntervalSeconds": 15,
+         "MaxAttempts": 2,
+         "BackoffRate": 2
+        }
+       ],
+       "Catch": [
+        {
+         "ErrorEquals": [
+          "States.ALL"
+         ],
+         "ResultPath": "$.error",
+         "Next": "HeatSkipped"
+        }
+       ],
+       "End": true
+      },
+      "HeatSkipped": {
+       "Type": "Pass",
+       "End": true
+      }
+     }
+    }
+   ]
+  },
+  "Score": {
+   "Type": "Task",
+   "Resource": "arn:aws:states:::lambda:invoke",
+   "Parameters": {
+    "FunctionName": "${GeoFnArn}",
+    "Payload": {
+     "task": "place.score",
+     "jobId.$": "$.jobId"
+    }
+   },
+   "ResultPath": null,
+   "Retry": [
+    {
+     "ErrorEquals": [
+      "Lambda.TooManyRequestsException",
+      "Lambda.ServiceException",
+      "Lambda.AWSLambdaException",
+      "Lambda.SdkClientException",
+      "Lambda.ClientExecutionTimeoutException"
+     ],
+     "IntervalSeconds": 8,
+     "MaxAttempts": 8,
+     "BackoffRate": 2,
+     "MaxDelaySeconds": 120,
+     "JitterStrategy": "FULL"
+    },
+    {
+     "ErrorEquals": [
+      "States.TaskFailed"
+     ],
+     "IntervalSeconds": 15,
+     "MaxAttempts": 2,
+     "BackoffRate": 2
+    }
+   ],
+   "Catch": [
+    {
+     "ErrorEquals": [
+      "States.ALL"
+     ],
+     "ResultPath": "$.error",
+     "Next": "Failed"
+    }
+   ],
+   "End": true
+  },
+  "Failed": {
+   "Type": "Task",
+   "Resource": "arn:aws:states:::lambda:invoke",
+   "Parameters": {
+    "FunctionName": "${GeoFnArn}",
+    "Payload": {
+     "task": "place.failed",
+     "jobId.$": "$.jobId",
+     "error.$": "$.error"
+    }
+   },
+   "ResultPath": null,
+   "Next": "Fail",
+   "Retry": [
+    {
+     "ErrorEquals": [
+      "Lambda.TooManyRequestsException",
+      "Lambda.ServiceException",
+      "Lambda.AWSLambdaException",
+      "Lambda.SdkClientException",
+      "Lambda.ClientExecutionTimeoutException"
+     ],
+     "IntervalSeconds": 8,
+     "MaxAttempts": 10,
+     "BackoffRate": 2,
+     "MaxDelaySeconds": 120,
+     "JitterStrategy": "FULL"
+    }
+   ]
+  },
+  "Fail": {
+   "Type": "Fail",
+   "Error": "PlaceCheckFailed"
+  }
+ }
+}

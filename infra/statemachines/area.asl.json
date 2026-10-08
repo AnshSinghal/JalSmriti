@@ -1,0 +1,537 @@
+{
+ "Comment": "Analyse every water body of one pre-loaded area (mode full) or refresh its latest satellite look (mode latest). Side work (static layers, latest look, radar, names) runs as one chain next to the scene map, so an area uses at most maxConcurrency + 1 Lambda runs at a time.",
+ "StartAt": "Defaults",
+ "States": {
+  "Defaults": {
+   "Type": "Pass",
+   "Parameters": {
+    "maxConcurrency": 4,
+    "mode": "full"
+   },
+   "ResultPath": "$.defaults",
+   "Next": "Merge"
+  },
+  "Merge": {
+   "Type": "Pass",
+   "Parameters": {
+    "merged.$": "States.JsonMerge($.defaults, $$.Execution.Input, false)"
+   },
+   "OutputPath": "$.merged",
+   "Next": "Mode"
+  },
+  "Mode": {
+   "Type": "Choice",
+   "Choices": [
+    {
+     "Variable": "$.mode",
+     "StringEquals": "latest",
+     "Next": "LatestOnly"
+    }
+   ],
+   "Default": "Prepare"
+  },
+  "Prepare": {
+   "Type": "Task",
+   "Resource": "arn:aws:states:::lambda:invoke",
+   "Parameters": {
+    "FunctionName": "${GeoFnArn}",
+    "Payload": {
+     "task": "area.prepare",
+     "areaId.$": "$.areaId"
+    }
+   },
+   "ResultSelector": {
+    "manifestKey.$": "$.Payload.manifestKey",
+    "scenes.$": "$.Payload.scenes"
+   },
+   "ResultPath": "$.prepared",
+   "Retry": [
+    {
+     "ErrorEquals": [
+      "Lambda.TooManyRequestsException",
+      "Lambda.ServiceException",
+      "Lambda.AWSLambdaException",
+      "Lambda.SdkClientException",
+      "Lambda.ClientExecutionTimeoutException"
+     ],
+     "IntervalSeconds": 8,
+     "MaxAttempts": 8,
+     "BackoffRate": 2,
+     "MaxDelaySeconds": 120,
+     "JitterStrategy": "FULL"
+    },
+    {
+     "ErrorEquals": [
+      "States.TaskFailed"
+     ],
+     "IntervalSeconds": 15,
+     "MaxAttempts": 2,
+     "BackoffRate": 2
+    }
+   ],
+   "Catch": [
+    {
+     "ErrorEquals": [
+      "States.ALL"
+     ],
+     "ResultPath": "$.error",
+     "Next": "Failed"
+    }
+   ],
+   "Next": "Work"
+  },
+  "Work": {
+   "Type": "Parallel",
+   "ResultPath": null,
+   "Next": "Aggregate",
+   "Catch": [
+    {
+     "ErrorEquals": [
+      "States.ALL"
+     ],
+     "ResultPath": "$.error",
+     "Next": "Failed"
+    }
+   ],
+   "Branches": [
+    {
+     "StartAt": "Scenes",
+     "States": {
+      "Scenes": {
+       "Type": "Map",
+       "MaxConcurrencyPath": "$.maxConcurrency",
+       "ToleratedFailurePercentage": 25,
+       "ResultPath": null,
+       "End": true,
+       "ItemReader": {
+        "Resource": "arn:aws:states:::s3:getObject",
+        "ReaderConfig": {
+         "InputType": "JSON"
+        },
+        "Parameters": {
+         "Bucket": "${DataBucket}",
+         "Key.$": "$.prepared.manifestKey"
+        }
+       },
+       "ItemProcessor": {
+        "ProcessorConfig": {
+         "Mode": "DISTRIBUTED",
+         "ExecutionType": "STANDARD"
+        },
+        "StartAt": "ProcessScene",
+        "States": {
+         "ProcessScene": {
+          "Type": "Task",
+          "Resource": "arn:aws:states:::lambda:invoke",
+          "Parameters": {
+           "FunctionName": "${GeoFnArn}",
+           "Payload": {
+            "task": "area.process_scene",
+            "job.$": "$"
+           }
+          },
+          "ResultSelector": {
+           "ok.$": "$.Payload.ok"
+          },
+          "ResultPath": "$",
+          "Retry": [
+           {
+            "ErrorEquals": [
+             "Lambda.TooManyRequestsException",
+             "Lambda.ServiceException",
+             "Lambda.AWSLambdaException",
+             "Lambda.SdkClientException",
+             "Lambda.ClientExecutionTimeoutException"
+            ],
+            "IntervalSeconds": 8,
+            "MaxAttempts": 8,
+            "BackoffRate": 2,
+            "MaxDelaySeconds": 120,
+            "JitterStrategy": "FULL"
+           },
+           {
+            "ErrorEquals": [
+             "States.TaskFailed"
+            ],
+            "IntervalSeconds": 15,
+            "MaxAttempts": 2,
+            "BackoffRate": 2
+           }
+          ],
+          "End": true
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "StartAt": "Static",
+     "States": {
+      "Static": {
+       "Type": "Task",
+       "Resource": "arn:aws:states:::lambda:invoke",
+       "Parameters": {
+        "FunctionName": "${GeoFnArn}",
+        "Payload": {
+         "task": "area.static_layers",
+         "areaId.$": "$.areaId"
+        }
+       },
+       "ResultPath": null,
+       "Retry": [
+        {
+         "ErrorEquals": [
+          "Lambda.TooManyRequestsException",
+          "Lambda.ServiceException",
+          "Lambda.AWSLambdaException",
+          "Lambda.SdkClientException",
+          "Lambda.ClientExecutionTimeoutException"
+         ],
+         "IntervalSeconds": 8,
+         "MaxAttempts": 8,
+         "BackoffRate": 2,
+         "MaxDelaySeconds": 120,
+         "JitterStrategy": "FULL"
+        },
+        {
+         "ErrorEquals": [
+          "States.TaskFailed"
+         ],
+         "IntervalSeconds": 15,
+         "MaxAttempts": 2,
+         "BackoffRate": 2
+        }
+       ],
+       "Next": "Latest"
+      },
+      "Latest": {
+       "Type": "Task",
+       "Resource": "arn:aws:states:::lambda:invoke",
+       "Parameters": {
+        "FunctionName": "${GeoFnArn}",
+        "Payload": {
+         "task": "area.latest_quality",
+         "areaId.$": "$.areaId"
+        }
+       },
+       "ResultPath": null,
+       "Retry": [
+        {
+         "ErrorEquals": [
+          "Lambda.TooManyRequestsException",
+          "Lambda.ServiceException",
+          "Lambda.AWSLambdaException",
+          "Lambda.SdkClientException",
+          "Lambda.ClientExecutionTimeoutException"
+         ],
+         "IntervalSeconds": 8,
+         "MaxAttempts": 8,
+         "BackoffRate": 2,
+         "MaxDelaySeconds": 120,
+         "JitterStrategy": "FULL"
+        },
+        {
+         "ErrorEquals": [
+          "States.TaskFailed"
+         ],
+         "IntervalSeconds": 15,
+         "MaxAttempts": 2,
+         "BackoffRate": 2
+        }
+       ],
+       "Catch": [
+        {
+         "ErrorEquals": [
+          "States.ALL"
+         ],
+         "ResultPath": "$.error",
+         "Next": "LatestSkipped"
+        }
+       ],
+       "Next": "Radar"
+      },
+      "LatestSkipped": {
+       "Type": "Pass",
+       "Next": "Radar"
+      },
+      "Radar": {
+       "Type": "Task",
+       "Resource": "arn:aws:states:::lambda:invoke",
+       "Parameters": {
+        "FunctionName": "${GeoFnArn}",
+        "Payload": {
+         "task": "area.radar_events",
+         "areaId.$": "$.areaId"
+        }
+       },
+       "ResultPath": null,
+       "Retry": [
+        {
+         "ErrorEquals": [
+          "Lambda.TooManyRequestsException",
+          "Lambda.ServiceException",
+          "Lambda.AWSLambdaException",
+          "Lambda.SdkClientException",
+          "Lambda.ClientExecutionTimeoutException"
+         ],
+         "IntervalSeconds": 8,
+         "MaxAttempts": 8,
+         "BackoffRate": 2,
+         "MaxDelaySeconds": 120,
+         "JitterStrategy": "FULL"
+        },
+        {
+         "ErrorEquals": [
+          "States.TaskFailed"
+         ],
+         "IntervalSeconds": 15,
+         "MaxAttempts": 2,
+         "BackoffRate": 2
+        }
+       ],
+       "Catch": [
+        {
+         "ErrorEquals": [
+          "States.ALL"
+         ],
+         "ResultPath": "$.error",
+         "Next": "RadarSkipped"
+        }
+       ],
+       "Next": "Names"
+      },
+      "RadarSkipped": {
+       "Type": "Pass",
+       "Next": "Names"
+      },
+      "Names": {
+       "Type": "Task",
+       "Resource": "arn:aws:states:::lambda:invoke",
+       "Parameters": {
+        "FunctionName": "${GeoFnArn}",
+        "Payload": {
+         "task": "area.name_lakes",
+         "areaId.$": "$.areaId",
+         "budgetSeconds": 780
+        }
+       },
+       "ResultPath": null,
+       "Retry": [
+        {
+         "ErrorEquals": [
+          "Lambda.TooManyRequestsException",
+          "Lambda.ServiceException",
+          "Lambda.AWSLambdaException",
+          "Lambda.SdkClientException",
+          "Lambda.ClientExecutionTimeoutException"
+         ],
+         "IntervalSeconds": 8,
+         "MaxAttempts": 8,
+         "BackoffRate": 2,
+         "MaxDelaySeconds": 120,
+         "JitterStrategy": "FULL"
+        },
+        {
+         "ErrorEquals": [
+          "States.TaskFailed"
+         ],
+         "IntervalSeconds": 15,
+         "MaxAttempts": 2,
+         "BackoffRate": 2
+        }
+       ],
+       "Catch": [
+        {
+         "ErrorEquals": [
+          "States.ALL"
+         ],
+         "ResultPath": "$.error",
+         "Next": "NamesSkipped"
+        }
+       ],
+       "End": true
+      },
+      "NamesSkipped": {
+       "Type": "Pass",
+       "End": true
+      }
+     }
+    }
+   ]
+  },
+  "Aggregate": {
+   "Type": "Task",
+   "Resource": "arn:aws:states:::lambda:invoke",
+   "Parameters": {
+    "FunctionName": "${GeoFnArn}",
+    "Payload": {
+     "task": "area.aggregate",
+     "areaId.$": "$.areaId"
+    }
+   },
+   "ResultPath": null,
+   "Retry": [
+    {
+     "ErrorEquals": [
+      "Lambda.TooManyRequestsException",
+      "Lambda.ServiceException",
+      "Lambda.AWSLambdaException",
+      "Lambda.SdkClientException",
+      "Lambda.ClientExecutionTimeoutException"
+     ],
+     "IntervalSeconds": 8,
+     "MaxAttempts": 8,
+     "BackoffRate": 2,
+     "MaxDelaySeconds": 120,
+     "JitterStrategy": "FULL"
+    },
+    {
+     "ErrorEquals": [
+      "States.TaskFailed"
+     ],
+     "IntervalSeconds": 15,
+     "MaxAttempts": 2,
+     "BackoffRate": 2
+    }
+   ],
+   "Catch": [
+    {
+     "ErrorEquals": [
+      "States.ALL"
+     ],
+     "ResultPath": "$.error",
+     "Next": "Failed"
+    }
+   ],
+   "End": true
+  },
+  "LatestOnly": {
+   "Type": "Task",
+   "Resource": "arn:aws:states:::lambda:invoke",
+   "Parameters": {
+    "FunctionName": "${GeoFnArn}",
+    "Payload": {
+     "task": "area.latest_quality",
+     "areaId.$": "$.areaId"
+    }
+   },
+   "ResultPath": null,
+   "Retry": [
+    {
+     "ErrorEquals": [
+      "Lambda.TooManyRequestsException",
+      "Lambda.ServiceException",
+      "Lambda.AWSLambdaException",
+      "Lambda.SdkClientException",
+      "Lambda.ClientExecutionTimeoutException"
+     ],
+     "IntervalSeconds": 8,
+     "MaxAttempts": 8,
+     "BackoffRate": 2,
+     "MaxDelaySeconds": 120,
+     "JitterStrategy": "FULL"
+    },
+    {
+     "ErrorEquals": [
+      "States.TaskFailed"
+     ],
+     "IntervalSeconds": 15,
+     "MaxAttempts": 2,
+     "BackoffRate": 2
+    }
+   ],
+   "Catch": [
+    {
+     "ErrorEquals": [
+      "States.ALL"
+     ],
+     "ResultPath": "$.error",
+     "Next": "Failed"
+    }
+   ],
+   "Next": "AggregateLatest"
+  },
+  "AggregateLatest": {
+   "Type": "Task",
+   "Resource": "arn:aws:states:::lambda:invoke",
+   "Parameters": {
+    "FunctionName": "${GeoFnArn}",
+    "Payload": {
+     "task": "area.aggregate",
+     "areaId.$": "$.areaId"
+    }
+   },
+   "ResultPath": null,
+   "Retry": [
+    {
+     "ErrorEquals": [
+      "Lambda.TooManyRequestsException",
+      "Lambda.ServiceException",
+      "Lambda.AWSLambdaException",
+      "Lambda.SdkClientException",
+      "Lambda.ClientExecutionTimeoutException"
+     ],
+     "IntervalSeconds": 8,
+     "MaxAttempts": 8,
+     "BackoffRate": 2,
+     "MaxDelaySeconds": 120,
+     "JitterStrategy": "FULL"
+    },
+    {
+     "ErrorEquals": [
+      "States.TaskFailed"
+     ],
+     "IntervalSeconds": 15,
+     "MaxAttempts": 2,
+     "BackoffRate": 2
+    }
+   ],
+   "Catch": [
+    {
+     "ErrorEquals": [
+      "States.ALL"
+     ],
+     "ResultPath": "$.error",
+     "Next": "Failed"
+    }
+   ],
+   "End": true
+  },
+  "Failed": {
+   "Type": "Task",
+   "Resource": "arn:aws:states:::lambda:invoke",
+   "Parameters": {
+    "FunctionName": "${GeoFnArn}",
+    "Payload": {
+     "task": "area.failed",
+     "areaId.$": "$.areaId",
+     "error.$": "$.error"
+    }
+   },
+   "ResultPath": null,
+   "Next": "Fail",
+   "Retry": [
+    {
+     "ErrorEquals": [
+      "Lambda.TooManyRequestsException",
+      "Lambda.ServiceException",
+      "Lambda.AWSLambdaException",
+      "Lambda.SdkClientException",
+      "Lambda.ClientExecutionTimeoutException"
+     ],
+     "IntervalSeconds": 8,
+     "MaxAttempts": 10,
+     "BackoffRate": 2,
+     "MaxDelaySeconds": 120,
+     "JitterStrategy": "FULL"
+    }
+   ]
+  },
+  "Fail": {
+   "Type": "Fail",
+   "Error": "AreaFailed",
+   "Cause": "See the failed step in the execution history"
+  }
+ }
+}

@@ -1,0 +1,49 @@
+{
+ "Comment": "Deploy-time preload: analyse each pre-loaded area in turn (one at a time to respect Lambda concurrency).",
+ "StartAt": "EachArea",
+ "States": {
+  "EachArea": {
+   "Type": "Map",
+   "ItemsPath": "$.areas",
+   "MaxConcurrency": 1,
+   "ResultPath": null,
+   "End": true,
+   "ItemSelector": {
+    "areaId.$": "$$.Map.Item.Value",
+    "mode": "full",
+    "maxConcurrency.$": "$.maxConcurrency"
+   },
+   "ItemProcessor": {
+    "ProcessorConfig": {
+     "Mode": "INLINE"
+    },
+    "StartAt": "RunArea",
+    "States": {
+     "RunArea": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::states:startExecution.sync:2",
+      "Parameters": {
+       "StateMachineArn": "${AreaSfnArn}",
+       "Input.$": "$"
+      },
+      "ResultPath": null,
+      "End": true,
+      "Catch": [
+       {
+        "ErrorEquals": [
+         "States.ALL"
+        ],
+        "ResultPath": "$.error",
+        "Next": "AreaFailed"
+       }
+      ]
+     },
+     "AreaFailed": {
+      "Type": "Pass",
+      "End": true
+     }
+    }
+   }
+  }
+ }
+}

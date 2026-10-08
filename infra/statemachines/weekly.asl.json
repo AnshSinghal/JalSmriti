@@ -1,0 +1,241 @@
+{
+ "Comment": "Every week: check watched lakes (email alerts through SNS) and refresh the latest look of each area.",
+ "StartAt": "Both",
+ "States": {
+  "Both": {
+   "Type": "Parallel",
+   "End": true,
+   "ResultPath": null,
+   "Branches": [
+    {
+     "StartAt": "ListWatched",
+     "States": {
+      "ListWatched": {
+       "Type": "Task",
+       "Resource": "arn:aws:states:::lambda:invoke",
+       "Parameters": {
+        "FunctionName": "${GeoFnArn}",
+        "Payload": {
+         "task": "watch.sweep"
+        }
+       },
+       "ResultSelector": {
+        "lakes.$": "$.Payload.lakes"
+       },
+       "ResultPath": "$.watched",
+       "Retry": [
+        {
+         "ErrorEquals": [
+          "Lambda.TooManyRequestsException",
+          "Lambda.ServiceException",
+          "Lambda.AWSLambdaException",
+          "Lambda.SdkClientException",
+          "Lambda.ClientExecutionTimeoutException"
+         ],
+         "IntervalSeconds": 8,
+         "MaxAttempts": 8,
+         "BackoffRate": 2,
+         "MaxDelaySeconds": 120,
+         "JitterStrategy": "FULL"
+        },
+        {
+         "ErrorEquals": [
+          "States.TaskFailed"
+         ],
+         "IntervalSeconds": 15,
+         "MaxAttempts": 2,
+         "BackoffRate": 2
+        }
+       ],
+       "Next": "CheckEach"
+      },
+      "CheckEach": {
+       "Type": "Map",
+       "ItemsPath": "$.watched.lakes",
+       "MaxConcurrency": 3,
+       "ResultPath": null,
+       "End": true,
+       "ItemProcessor": {
+        "ProcessorConfig": {
+         "Mode": "INLINE"
+        },
+        "StartAt": "Check",
+        "States": {
+         "Check": {
+          "Type": "Task",
+          "Resource": "arn:aws:states:::lambda:invoke",
+          "Parameters": {
+           "FunctionName": "${GeoFnArn}",
+           "Payload": {
+            "task": "watch.check",
+            "lakeId.$": "$.lakeId"
+           }
+          },
+          "ResultPath": null,
+          "Retry": [
+           {
+            "ErrorEquals": [
+             "Lambda.TooManyRequestsException",
+             "Lambda.ServiceException",
+             "Lambda.AWSLambdaException",
+             "Lambda.SdkClientException",
+             "Lambda.ClientExecutionTimeoutException"
+            ],
+            "IntervalSeconds": 8,
+            "MaxAttempts": 8,
+            "BackoffRate": 2,
+            "MaxDelaySeconds": 120,
+            "JitterStrategy": "FULL"
+           },
+           {
+            "ErrorEquals": [
+             "States.TaskFailed"
+            ],
+            "IntervalSeconds": 15,
+            "MaxAttempts": 2,
+            "BackoffRate": 2
+           }
+          ],
+          "Catch": [
+           {
+            "ErrorEquals": [
+             "States.ALL"
+            ],
+            "ResultPath": "$.error",
+            "Next": "CheckFailed"
+           }
+          ],
+          "End": true
+         },
+         "CheckFailed": {
+          "Type": "Pass",
+          "End": true
+         }
+        }
+       }
+      }
+     }
+    },
+    {
+     "StartAt": "RefreshAreas",
+     "States": {
+      "RefreshAreas": {
+       "Type": "Map",
+       "ItemsPath": "$.areas",
+       "MaxConcurrency": 2,
+       "ResultPath": null,
+       "End": true,
+       "ItemSelector": {
+        "areaId.$": "$$.Map.Item.Value"
+       },
+       "ItemProcessor": {
+        "ProcessorConfig": {
+         "Mode": "INLINE"
+        },
+        "StartAt": "Latest",
+        "States": {
+         "Latest": {
+          "Type": "Task",
+          "Resource": "arn:aws:states:::lambda:invoke",
+          "Parameters": {
+           "FunctionName": "${GeoFnArn}",
+           "Payload": {
+            "task": "area.latest_quality",
+            "areaId.$": "$.areaId"
+           }
+          },
+          "ResultPath": null,
+          "Retry": [
+           {
+            "ErrorEquals": [
+             "Lambda.TooManyRequestsException",
+             "Lambda.ServiceException",
+             "Lambda.AWSLambdaException",
+             "Lambda.SdkClientException",
+             "Lambda.ClientExecutionTimeoutException"
+            ],
+            "IntervalSeconds": 8,
+            "MaxAttempts": 8,
+            "BackoffRate": 2,
+            "MaxDelaySeconds": 120,
+            "JitterStrategy": "FULL"
+           },
+           {
+            "ErrorEquals": [
+             "States.TaskFailed"
+            ],
+            "IntervalSeconds": 15,
+            "MaxAttempts": 2,
+            "BackoffRate": 2
+           }
+          ],
+          "Catch": [
+           {
+            "ErrorEquals": [
+             "States.ALL"
+            ],
+            "ResultPath": "$.error",
+            "Next": "Skip"
+           }
+          ],
+          "Next": "Agg"
+         },
+         "Agg": {
+          "Type": "Task",
+          "Resource": "arn:aws:states:::lambda:invoke",
+          "Parameters": {
+           "FunctionName": "${GeoFnArn}",
+           "Payload": {
+            "task": "area.aggregate",
+            "areaId.$": "$.areaId"
+           }
+          },
+          "ResultPath": null,
+          "Retry": [
+           {
+            "ErrorEquals": [
+             "Lambda.TooManyRequestsException",
+             "Lambda.ServiceException",
+             "Lambda.AWSLambdaException",
+             "Lambda.SdkClientException",
+             "Lambda.ClientExecutionTimeoutException"
+            ],
+            "IntervalSeconds": 8,
+            "MaxAttempts": 8,
+            "BackoffRate": 2,
+            "MaxDelaySeconds": 120,
+            "JitterStrategy": "FULL"
+           },
+           {
+            "ErrorEquals": [
+             "States.TaskFailed"
+            ],
+            "IntervalSeconds": 15,
+            "MaxAttempts": 2,
+            "BackoffRate": 2
+           }
+          ],
+          "Catch": [
+           {
+            "ErrorEquals": [
+             "States.ALL"
+            ],
+            "ResultPath": "$.error",
+            "Next": "Skip"
+           }
+          ],
+          "End": true
+         },
+         "Skip": {
+          "Type": "Pass",
+          "End": true
+         }
+        }
+       }
+      }
+     }
+    }
+   ]
+  }
+ }
+}
