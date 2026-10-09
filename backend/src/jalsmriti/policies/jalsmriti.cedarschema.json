@@ -1,0 +1,27 @@
+{
+  "JalSmriti": {
+    "entityTypes": {
+      "User": {"shape": {"type": "Record", "attributes": {"role": {"type": "String"}, "jurisdictions": {"type": "Set", "element": {"type": "String"}}}}},
+      "Area": {"shape": {"type": "Record", "attributes": {"id": {"type": "String"}}}},
+      "Lake": {"shape": {"type": "Record", "attributes": {"area": {"type": "String"}, "kind": {"type": "String"}}}},
+      "Evidence": {"shape": {"type": "Record", "attributes": {"area": {"type": "String"}, "lake": {"type": "String"}, "status": {"type": "String"}, "uploader": {"type": "Entity", "name": "User"}}}},
+      "Dossier": {"shape": {"type": "Record", "attributes": {"area": {"type": "String"}, "lake": {"type": "String"}, "status": {"type": "String"}, "creator": {"type": "Entity", "name": "User"}}}},
+      "Report": {"shape": {"type": "Record", "attributes": {"area": {"type": "String"}, "status": {"type": "String"}, "reporter": {"type": "Entity", "name": "User"}}}}
+    },
+    "actions": {
+      "UploadEvidence": {"appliesTo": {"principalTypes": ["User"], "resourceTypes": ["Lake"], "context": {"type": "Record", "attributes": {}}}},
+      "CreateDossier": {"appliesTo": {"principalTypes": ["User"], "resourceTypes": ["Lake"], "context": {"type": "Record", "attributes": {}}}},
+      "WatchLake": {"appliesTo": {"principalTypes": ["User"], "resourceTypes": ["Lake"], "context": {"type": "Record", "attributes": {}}}},
+      "MarkSubmitted": {"appliesTo": {"principalTypes": ["User"], "resourceTypes": ["Dossier"], "context": {"type": "Record", "attributes": {}}}},
+      "ReviewEvidence": {"appliesTo": {"principalTypes": ["User"], "resourceTypes": ["Evidence"], "context": {"type": "Record", "attributes": {"hasNote": {"type": "Boolean"}}}}},
+      "RespondDossier": {"appliesTo": {"principalTypes": ["User"], "resourceTypes": ["Dossier"], "context": {"type": "Record", "attributes": {"hasNote": {"type": "Boolean"}}}}},
+      "ViewQueue": {"appliesTo": {"principalTypes": ["User"], "resourceTypes": ["Area"], "context": {"type": "Record", "attributes": {}}}},
+      "ViewAudit": {"appliesTo": {"principalTypes": ["User"], "resourceTypes": ["Area"], "context": {"type": "Record", "attributes": {}}}},
+      "DeleteEvidence": {"appliesTo": {"principalTypes": ["User"], "resourceTypes": ["Evidence"], "context": {"type": "Record", "attributes": {}}}},
+      "FollowPlace": {"appliesTo": {"principalTypes": ["User"], "resourceTypes": ["Area"], "context": {"type": "Record", "attributes": {}}}},
+      "RecordRti": {"appliesTo": {"principalTypes": ["User"], "resourceTypes": ["Lake"], "context": {"type": "Record", "attributes": {}}}},
+      "ReportWaterlogging": {"appliesTo": {"principalTypes": ["User"], "resourceTypes": ["Area"], "context": {"type": "Record", "attributes": {}}}},
+      "ReviewReport": {"appliesTo": {"principalTypes": ["User"], "resourceTypes": ["Report"], "context": {"type": "Record", "attributes": {"hasNote": {"type": "Boolean"}}}}}
+    }
+  }
+}
