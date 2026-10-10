@@ -1,0 +1,140 @@
+@import "@fontsource-variable/anek-latin/wdth.css";
+@import "@fontsource-variable/anek-devanagari/wdth.css";
+@import "@fontsource-variable/anek-kannada/wdth.css";
+@import "@fontsource-variable/anek-tamil/wdth.css";
+@import "@fontsource-variable/anek-telugu/wdth.css";
+@import "@fontsource-variable/anek-malayalam/wdth.css";
+@import "maplibre-gl/dist/maplibre-gl.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ------------------------------------------------------------------------------------------ tokens
+   Light: "survey paper" - cool sheet white, indigo ink, cyanotype blue for remembered water.
+   Dark:  "monsoon night" - deep indigo, not black. Red and amber only ever mean loss. */
+:root {
+  --paper: 243 246 245;
+  --paper-2: 232 238 236;
+  --paper-3: 220 229 228;
+  --ink: 19 35 58;
+  --ink-2: 74 90 110;
+  --line: 203 213 214;
+  --memory: 31 79 153;
+  --memory-soft: 201 216 238;
+  --lost: 217 144 26;
+  --built: 210 58 53;
+  --live: 14 138 123;
+  --font-body: "Anek Latin Variable", "Anek Devanagari Variable", "Anek Kannada Variable", "Anek Tamil Variable",
+    "Anek Telugu Variable", "Anek Malayalam Variable", system-ui, sans-serif;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --paper: 13 22 38;
+  --paper-2: 19 33 58;
+  --paper-3: 27 45 76;
+  --ink: 228 236 245;
+  --ink-2: 154 170 192;
+  --line: 38 55 82;
+  --memory: 111 168 245;
+  --memory-soft: 27 52 89;
+  --lost: 242 177 61;
+  --built: 255 106 92;
+  --live: 60 199 178;
+  color-scheme: dark;
+}
+:root[lang="hi"], :root[lang="ne"] { --font-body: "Anek Devanagari Variable", "Anek Latin Variable", system-ui, sans-serif; }
+:root[lang="kn"] { --font-body: "Anek Kannada Variable", "Anek Latin Variable", system-ui, sans-serif; }
+:root[lang="ta"] { --font-body: "Anek Tamil Variable", "Anek Latin Variable", system-ui, sans-serif; }
+:root[lang="te"] { --font-body: "Anek Telugu Variable", "Anek Latin Variable", system-ui, sans-serif; }
+:root[lang="ml"] { --font-body: "Anek Malayalam Variable", "Anek Latin Variable", system-ui, sans-serif; }
+
+/* ------------------------------------------------------------------------------------------ base */
+@layer base {
+  html { -webkit-text-size-adjust: 100%; text-rendering: optimizeLegibility; }
+  body {
+    @apply bg-paper text-ink antialiased;
+    font-family: var(--font-body);
+    font-size: 17px;
+    line-height: 1.55;
+    font-stretch: 100%;
+    font-feature-settings: "kern", "liga", "tnum" 0;
+  }
+  h1, h2, h3, .display { font-stretch: 75%; font-weight: 700; letter-spacing: -0.005em; line-height: 1.04; }
+  h1 { font-size: clamp(2.6rem, 6.4vw, 4.6rem); }
+  h2 { font-size: clamp(2rem, 4vw, 2.75rem); }
+  h3 { font-size: 1.32rem; line-height: 1.2; }
+  :root[lang="hi"] h1, :root[lang="kn"] h1, :root[lang="ta"] h1, :root[lang="te"] h1, :root[lang="ml"] h1, :root[lang="ne"] h1 {
+    line-height: 1.18; font-size: clamp(2.2rem, 5.2vw, 3.8rem);
+  }
+  a { color: inherit; }
+  ::selection { background: rgb(var(--memory) / 0.25); }
+  :focus-visible { outline: 2.5px solid rgb(var(--memory)); outline-offset: 2px; border-radius: 4px; }
+  img { max-width: 100%; }
+}
+
+/* ------------------------------------------------------------------------------------------ components */
+@layer components {
+  .num { font-variant-numeric: tabular-nums; font-stretch: 75%; font-weight: 700; }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2.5 text-[15px] font-semibold transition-colors
+      disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary { @apply btn bg-ink text-paper hover:bg-memory; }
+  .btn-memory { @apply btn bg-memory text-white hover:brightness-110; }
+  :root[data-theme="dark"] .btn-memory { @apply text-paper; }
+  .btn-quiet { @apply btn border border-line bg-paper text-ink hover:border-ink-2; }
+  .btn-ghost { @apply btn px-2.5 text-ink-2 hover:text-ink; }
+  .field {
+    @apply w-full rounded-md border border-line bg-paper px-3.5 py-2.5 text-[16px] text-ink placeholder:text-ink-2/70
+      focus:border-memory focus:outline-none focus:ring-2 focus:ring-memory/25;
+  }
+  .label { @apply mb-1 block text-[14px] font-semibold text-ink-2; }
+  .panel { @apply rounded-lg border border-line bg-paper; }
+  .rule { @apply border-t border-line; }
+  .muted { @apply text-ink-2; }
+  .link { @apply underline decoration-memory/40 underline-offset-[3px] hover:decoration-memory; }
+  .chip { @apply inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1 text-[14px] text-ink-2 hover:border-memory hover:text-ink; }
+  .tag { @apply inline-flex items-center rounded px-1.5 py-0.5 text-[12.5px] font-semibold; }
+  .skeleton { @apply animate-pulse rounded bg-paper-3; }
+  /* a small control (a 24 px checkbox) with a 44 px invisible target around it */
+  .hit { position: relative; }
+  .hit::before { content: ""; position: absolute; inset: -10px; }
+}
+
+/* ------------------------------------------------------------------------------------------ touch
+   On touch screens every control is at least 44 px tall, and icon buttons 44 px square: the size of a fingertip.
+   Mouse and trackpad layouts keep their tighter sizes. */
+@media (pointer: coarse) {
+  .btn, .btn-primary, .btn-memory, .btn-quiet, .btn-ghost, .chip, .tap,
+  [role="tab"], [role="radio"], button[aria-pressed] { min-height: 44px; }
+  .btn-ghost, .tap-sq { min-width: 44px; min-height: 44px; }
+  .maplibregl-ctrl-group button { width: 44px; height: 44px; }
+}
+
+/* ------------------------------------------------------------------------------------------ the flood mark
+   Painted high-flood-level (HFL) marks on Indian bridges and walls inspired the year gauge and grade plates. */
+.floodmark { position: relative; height: 0; border-top: 2px solid rgb(var(--built)); }
+.floodmark::before { content: ""; position: absolute; left: 0; top: -7px; width: 2px; height: 12px; background: rgb(var(--built)); }
+
+.plate {
+  display: inline-grid; place-items: center; min-width: 3.1rem; padding: 0.1rem 0.55rem;
+  border-top: 5px solid currentColor; border-bottom: 5px solid currentColor;
+  font-stretch: 75%; font-weight: 800; line-height: 1; letter-spacing: 0.02em;
+}
+
+/* ------------------------------------------------------------------------------------------ map */
+.maplibregl-ctrl-attrib { font-size: 11px; }
+.maplibregl-popup-content { background: rgb(var(--paper)); color: rgb(var(--ink)); border-radius: 8px; padding: 10px 12px;
+  box-shadow: 0 6px 24px rgb(0 0 0 / 0.18); font-family: var(--font-body); }
+.maplibregl-popup-tip { border-top-color: rgb(var(--paper)) !important; border-bottom-color: rgb(var(--paper)) !important; }
+:root[data-theme="dark"] .maplibregl-ctrl-group { background: rgb(var(--paper-2)); }
+:root[data-theme="dark"] .maplibregl-ctrl-group button .maplibregl-ctrl-icon { filter: invert(1); }
+
+/* the one orchestrated moment: remembered water floods in on the landing map */
+@keyframes flood-in { from { clip-path: inset(100% 0 0 0); opacity: 0.2; } to { clip-path: inset(0 0 0 0); opacity: 1; } }
+.flood-in { animation: flood-in 1600ms cubic-bezier(0.2, 0.7, 0.1, 1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; scroll-behavior: auto !important; }
+}
