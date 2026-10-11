@@ -284,6 +284,19 @@ def test_confident_no_water_waits_for_a_verifier(aws, monkeypatch):
     assert W.process(report(), photo(*BELLANDUR))["status"] == "live"      # unsure: it goes live
 
 
+def test_screenshot_waits_for_a_verifier(aws, monkeypatch):
+    from jalsmriti import evidence as E
+    wet = {"waterVisible": True, "depth": "knee", "summary": "A flooded street.", "confidence": 0.9, "model": "test"}
+    monkeypatch.setattr(W, "look", lambda jpeg: dict(wet))
+    monkeypatch.setattr(E, "text_words", lambda jpeg: 48)        # a screenshot of a news page about a flood
+    rid = report()
+    it = W.process(rid, photo(*BELLANDUR))
+    assert it["status"] == "hidden" and it["hiddenReason"] == "text" and it["textWords"] == 48
+    assert rid not in ids(W.recent()) and W.public(it)["hiddenReason"] == "text"
+    monkeypatch.setattr(E, "text_words", lambda jpeg: 3)         # a street sign in a real photo is fine
+    assert W.process(report(), photo(*BELLANDUR))["status"] == "live"
+
+
 def test_blocked_photo_is_audited_and_never_published(aws, monkeypatch):
     from jalsmriti import evidence as E
     label = {"name": "Graphic Violence", "parent": None, "confidence": 97.0}

@@ -83,3 +83,24 @@ def test_every_area_has_authorities_and_laws():
         assert a.authorities and a.laws and a.events, a.id
         assert all(e["date"] and e["title"] and e["detail"] for e in a.events)
         assert a.bbox[0] < a.bbox[2] and a.bbox[1] < a.bbox[3]
+
+
+def test_a_refused_amazon_translate_hands_every_letter_to_nova(monkeypatch):
+    """AWS's new Free Tier has no Amazon Translate: the first refusal switches all later letters straight to Nova."""
+    from botocore.exceptions import ClientError
+    calls = []
+
+    class Refusing:
+        def translate_text(self, **kw):
+            calls.append(kw)
+            raise ClientError({"Error": {"Code": "AccessDeniedException", "Message": "with an explicit deny in a service "
+                                         "control policy"}}, "TranslateText")
+
+    monkeypatch.setattr(T.C, "LOCAL", False)
+    monkeypatch.setattr(T, "_translate_client", lambda: Refusing())
+    monkeypatch.setitem(T._TRANSLATE_REFUSED, "refused", False)
+    monkeypatch.setattr(T, "_bedrock_translate", lambda text, target: "ಕೆರೆ " + text)
+    for _ in range(3):
+        r = T.translate("12.5 ha of water was lost; 55% held.", "kn")
+        assert r["engine"].startswith("Amazon Nova") and r["numbersOk"]
+    assert len(calls) == 1

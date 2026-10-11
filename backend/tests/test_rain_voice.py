@@ -497,3 +497,23 @@ def test_synthesize_with_polly(monkeypatch):
                       "OutputFormat": "mp3"}]
     assert (Path(storage.LOCAL_DIR) / "site" / "pub" / "speech" / f"{key}.mp3").read_bytes() == b"ID3 not really an mp3"
     assert speech.synthesize(text, "hi")["cached"] is True and len(calls) == 1
+
+
+def test_aditi_reads_where_kajal_is_not_offered(monkeypatch):
+    from botocore.exceptions import ClientError
+    from jalsmriti import config as C
+    from jalsmriti import speech
+    calls = []
+
+    class NoKajal:
+        def synthesize_speech(self, **kw):
+            calls.append(kw["VoiceId"])
+            if kw["VoiceId"] == "Kajal":
+                raise ClientError({"Error": {"Code": "EngineNotSupportedException", "Message": "neural not here"}},
+                                  "SynthesizeSpeech")
+            return {"AudioStream": io.BytesIO(b"ID3 aditi")}
+
+    monkeypatch.setattr(C, "LOCAL", False)
+    monkeypatch.setattr(speech, "_polly", lambda: NoKajal())
+    r = speech.synthesize(f"Bellandur water memory report {uuid.uuid4().hex[:6]}.", "en")
+    assert (r["voice"], r["engine"], r["cached"]) == ("Aditi", "standard", False) and calls == ["Kajal", "Aditi"]
