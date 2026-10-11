@@ -2,6 +2,8 @@
 
 Made by **Ansh Singhal**.
 
+https://jalsmriti.anshsinghal.tech/
+
 ![JalSmriti: Bengaluru's water memory over a Sentinel-2 image of December 2025](docs/images/landing.jpg)
 
 Indian cities flood where their lakes used to be. JalSmriti reads forty years of open satellite data and tells anyone in
