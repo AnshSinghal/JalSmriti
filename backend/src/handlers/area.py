@@ -388,6 +388,82 @@ def name_lakes(event, context=None):
     return {"ok": True, "named": len(got), "remaining": max(0, len(todo) - len(got))}
 
 
+def body_names(area, bodies: list[dict], nm: dict) -> dict[str, dict]:
+    """{lakeId: {"name", "source", "admin"}} for every body: its own name (OpenStreetMap, GeoNames) where it has one,
+    else named after what is near it (names.fallback_name), and repeated names told apart (names.distinct)."""
+    real = {}
+    for b in bodies:
+        e = nm.get(b["lakeId"]) or {}
+        if e.get("name") and e.get("source") in names.REAL_SOURCES:
+            real[b["lakeId"]] = (e["name"], e["source"])
+        elif b["kind"] == "lake":
+            gn = names.geonames_near(b["lat"], b["lon"], 400)
+            if gn:
+                real[b["lakeId"]] = (gn, "GeoNames")
+    lakes = [(b["lat"], b["lon"], real[b["lakeId"]][0]) for b in bodies if b["lakeId"] in real]
+    # GeoNames lakes nearby too, unless one of the named bodies is already there (often the same lake, spelt
+    # differently: GeoNames "Belandur Tank" is OpenStreetMap's "Bellandur Lake")
+    lakes += [g for g in names.geonames_anchors(area.bbox)
+              if not names.nearest(g[0], g[1], lakes, names.NEAR_M) and g[2] not in {x[2] for x in lakes}]
+    places = [(b["lat"], b["lon"], (nm.get(b["lakeId"]) or {}).get("locality")) for b in bodies
+              if (nm.get(b["lakeId"]) or {}).get("locality")]
+    area_name = (area.names or {}).get("en")
+    out, made = {}, []
+    for b in bodies:
+        lid = b["lakeId"]
+        e = nm.get(lid) or {}
+        admin = {k: v for k, v in e.items() if k not in ("name", "source")}
+        if lid in real:
+            out[lid] = {"name": real[lid][0], "source": real[lid][1], "admin": admin}
+            continue
+        f = names.fallback_name(b["lat"], b["lon"], b["kind"], lakes, places,
+                                e if e.get("source") == "generated" else None, area_name)
+        made.append({**f, "lakeId": lid})
+        out[lid] = {"admin": admin}
+    names.distinct(made)
+    for f in made:
+        out[f["lakeId"]].update(name=f["name"], source=f["source"])
+    return out
+
+
+def rename(event, context=None):
+    """Re-name an area's water bodies with today's rules without reading any imagery again: the list rows, the lake
+    records and the public lakes.geojson are updated in place. Run by deploy.py after an update."""
+    area = _area(event["areaId"])
+    try:
+        meta = storage.get_data_json(f"areas/{area.id}/base.json")
+    except Exception:
+        return {"ok": False, "reason": "area not loaded yet"}
+    bodies = meta["bodies"]
+    named = body_names(area, bodies, _opt(f"areas/{area.id}/names.json", {}))
+    rows = {r["lakeId"]: r for r in store.query_all(f"AREA#{area.id}", "LAKE#")}
+    changed = 0
+    for b in bodies:
+        lid, n = b["lakeId"], named[b["lakeId"]]
+        row = rows.get(lid)
+        if not row or row.get("name") == n["name"]:
+            continue
+        store.update(f"AREA#{area.id}", f"LAKE#{lid}", sets={"name": n["name"]})
+        if store.get(f"LAKE#{lid}"):
+            store.update(f"LAKE#{lid}", "META", sets={"name": n["name"], "nameSource": n["source"]})
+        changed += 1
+    path = f"areas/{area.id}/lakes.geojson"
+    try:
+        gj = storage.get_public_json(path)
+    except Exception:
+        gj = None
+    if gj and changed:
+        for f in gj.get("features", []):
+            n = named.get((f.get("properties") or {}).get("lakeId"))
+            if n:
+                f["properties"]["name"] = n["name"]
+        storage.put_public_json(path, gj, 300)
+    sources: dict[str, int] = {}
+    for n in named.values():
+        sources[n["source"]] = sources.get(n["source"], 0) + 1
+    return {"ok": True, "areaId": area.id, "bodies": len(bodies), "renamed": changed, "sources": sources}
+
+
 # ------------------------------------------------------------------------------------------ 7. aggregate
 def _load_looks(area_id: str) -> dict[str, list[dict]]:
     by_lake: dict[str, list[dict]] = {}
@@ -440,11 +516,10 @@ def aggregate(event, context=None):
     summaries, details, features = [], [], []
     grades: dict[str, int] = {}
     tot_hist = tot_lost = tot_built = 0.0
+    named = body_names(area, bodies, nm)
     for body in bodies:
         lid = body["lakeId"]
-        name = (nm.get(lid) or {}).get("name") or names.geonames_near(body["lat"], body["lon"], 400) or \
-            ("River stretch" if body["kind"] == "river" else "Unnamed water body")
-        admin = {k: v for k, v in (nm.get(lid) or {}).items() if k not in ("name", "source")}
+        name, admin = named[lid]["name"], named[lid]["admin"]
         st = land.get(lid) or {"jrc": {"histPx": 0, "lostPx": 0}, "land": {"pxHa": px_ha}}
         series = metrics.season_series(looks.get(lid, []), px_ha)
         complete = rn.get("complete", {})
@@ -470,7 +545,7 @@ def aggregate(event, context=None):
         summaries.append(row)
         if summ:
             details.append({"PK": f"LAKE#{lid}", "SK": "META", "lakeId": lid, "areaId": area.id, "name": name,
-                            "nameSource": (nm.get(lid) or {}).get("source", "GeoNames/generated"), "admin": admin,
+                            "nameSource": named[lid]["source"], "admin": admin,
                             "kind": body["kind"], "areaHa": body["areaHa"], "lon": body["lon"], "lat": body["lat"],
                             "geometry": geo_feat["geometry"], "metrics": summ, "findings": metrics.lake_findings(summ),
                             "frames": frame_seasons, "latestDate": latest.get("date"),

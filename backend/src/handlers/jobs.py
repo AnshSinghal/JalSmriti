@@ -131,6 +131,11 @@ def build_report(report_id: str) -> dict:
         nearby = None
     payload = placereport.payload(r, place)
     payload["waterReports"] = (nearby or {}).get("count")
+    if payload.get("answers"):                    # the verdict the report gives, so the signature covers it too
+        from jalsmriti import verdict as V
+        v = V.build(place, payload["answers"], (nearby or {}).get("count") or 0)
+        payload["verdict"] = {"level": v["level"], "points": v["points"],
+                              "keys": [x["key"] for x in v["why"] + v["pros"] + v["cons"]]}
     payload_sha = ledger.sha256_hex(ledger.canonical(payload))
     site = storage.site_url()
     verify_url = f"{site}/verify/{report_id}" if site else f"/verify/{report_id}"

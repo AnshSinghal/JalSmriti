@@ -251,7 +251,18 @@ def aggregate(event, context=None):
     try:
         nm = names.water_body_name(body["lat"], body["lon"], body["areaHa"])
     except Exception:
-        nm = {"name": names.geonames_near(body["lat"], body["lon"], 500) or "Unnamed water body", "source": "GeoNames/generated"}
+        nm = {}
+    if nm.get("source") not in names.REAL_SOURCES:      # no name of its own: GeoNames close by, else what is near
+        gn = names.geonames_near(body["lat"], body["lon"], 500)
+        if gn:
+            nm = {**nm, "name": gn, "source": "GeoNames"}
+        else:
+            area = A.AREAS.get(body.get("areaId") or "")
+            near = names.geonames_anchors([body["lon"], body["lat"], body["lon"], body["lat"]])
+            f = names.fallback_name(body["lat"], body["lon"], body["kind"], near, [],
+                                    nm if nm.get("source") == "generated" else None,
+                                    (area.names or {}).get("en") if area else None)
+            nm = {**nm, "name": f["name"], "source": f["source"]}
     feat = lakes.lonlat_feature({"lakeId": lake_id, "kind": body["kind"], "areaHa": body["areaHa"], "geomUtm": body["geomUtm"]}, g.crs)
     frames_list = lk.get("frames", []) + (["latest"] if lt else [])
     item = {"PK": f"LAKE#{lake_id}", "SK": "META", "lakeId": lake_id, "areaId": body.get("areaId") or "other",

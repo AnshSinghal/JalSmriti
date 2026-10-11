@@ -20,7 +20,7 @@ from aws_lambda_powertools.event_handler.exceptions import BadRequestError, NotF
 
 from jalsmriti import actions as ACT
 from jalsmriti import areas as A
-from jalsmriti import authz, forecast, geo, ledger, names, narration, signing, speech, storage, store, strings, waterlog
+from jalsmriti import authz, forecast, geo, insights, ledger, names, narration, news, signing, speech, storage, store, strings, verdict, waterlog
 from jalsmriti import config as C
 
 logger = Logger(service="jalsmriti-api")
@@ -232,7 +232,31 @@ def get_lake(lake_id: str):
     out["authorities"] = area.authorities if area else A.default_authorities(country)
     out["laws"] = area.laws if area else (A.LAW_NP if country == "NP" else A.LAW_IN)
     out["watchers"] = int(watched.get("count", 0))
+    out["insights"] = insights.lake_insights(lk)
     return out
+
+
+@app.get("/v1/lakes/<lake_id>/news")
+def lake_news(lake_id: str):
+    """Recent news naming the lake (Google News, then GDELT), for lakes with a name of their own."""
+    lk = lake_or_404(lake_id)
+    own = lk.get("nameSource") in names.REAL_SOURCES
+    rate(client_ip(), "news")
+    res = news.search(news.lake_query(lk.get("name"), lk.get("areaId")) if own else None, "lake")
+    if not own:
+        res["reason"] = "no name of its own"
+    return {**res, "tags": news.summary(res["articles"])}
+
+
+@app.get("/v1/news/floods")
+def place_news():
+    """Recent news of flooding that names a locality (Google News, then GDELT): ?locality=Velachery"""
+    loc = str(q("locality") or "").strip()[:60]
+    if len(loc) < 4:
+        raise BadRequestError("give a locality name of at least 4 letters")
+    rate(client_ip(), "news")
+    res = news.search(news.place_query(loc), "floods", title_has=loc)
+    return {**res, "locality": loc, "tags": news.summary(res["articles"])}
 
 
 @app.get("/v1/lakes/<lake_id>/evidence")
@@ -402,6 +426,30 @@ def place_forecast():
     return fc
 
 
+def verdict_answers(src: dict) -> dict:
+    return verdict.answers({k: src.get(k) for k in ("mode", "floor", "parking", "vulnerable")})
+
+
+def reports_near(lat: float, lon: float) -> int:
+    try:
+        return int(waterlog.nearby(lat, lon, 1000, 365)["count"])
+    except Exception as ex:          # the verdict still stands on the satellite record
+        logger.warning("nearby reports failed: %s", ex)
+        return 0
+
+
+@app.get("/v1/places/verdict")
+def place_verdict():
+    """Our read for someone about to rent or buy here, from the stored check and four answers:
+    ?lat=&lon=&mode=rent|buy&floor=ground|low|high|house&parking=1&vulnerable=1"""
+    lat, lon = lat_lon({"lat": q("lat"), "lon": q("lon")})
+    cached = place_cached(lat, lon)
+    if not cached:
+        raise ServiceError(409, "check this place first")
+    src = {k: q(k) for k in ("mode", "floor", "parking", "vulnerable")}
+    return verdict.build(cached, verdict_answers(src), reports_near(lat, lon))
+
+
 @app.post("/v1/places/report")
 def create_report():
     """A signed PDF of the place check in the reader's language, for someone renting, buying or living there."""
@@ -413,8 +461,12 @@ def create_report():
     if not cached:
         raise ServiceError(409, "check this place first")
     gh = geo.geohash(lat, lon, 7)
-    # the same check, language and reader always give the same report, so the id is derived and the PDF is reused
-    rid = "rpt" + hashlib.sha256(f"{gh}|{C.PLACE_CACHE_VERSION}|{cached.get('checkedAt')}|{lang}|{persona}".encode()).hexdigest()[:16]
+    # a family about to rent or buy can add its four answers: the report then carries our read for them
+    answers = verdict_answers(b["answers"]) if persona == "home" and isinstance(b.get("answers"), dict) else None
+    ans_key = "|".join(str(answers[k]) for k in ("mode", "floor", "parking", "vulnerable")) if answers else ""
+    # the same check, language, reader and answers always give the same report, so the id is derived and reused
+    seed = f"{gh}|{C.PLACE_CACHE_VERSION}|{cached.get('checkedAt')}|{lang}|{persona}" + (f"|{ans_key}" if ans_key else "")
+    rid = "rpt" + hashlib.sha256(seed.encode()).hexdigest()[:16]
     existing = store.get(f"RPT#{rid}")
     if existing and (existing.get("status") == "ready" or
                      (existing.get("status") == "rendering" and existing.get("createdAt", "") > store.iso_days_ago(10 / 1440))):
@@ -423,7 +475,8 @@ def create_report():
     rate("site", "report-all")
     label = str(b.get("label") or (cached.get("label") or {}).get("label") or "").strip()[:140] or None
     item = {"PK": f"RPT#{rid}", "SK": "META", "reportId": rid, "status": "rendering", "gh7": gh, "lat": round(lat, 5),
-            "lon": round(lon, 5), "label": label, "lang": lang, "persona": persona, "checkedAt": cached.get("checkedAt"),
+            "lon": round(lon, 5), "label": label, "lang": lang, "persona": persona, "answers": answers,
+            "checkedAt": cached.get("checkedAt"),
             "createdAt": store.now_iso(), "ttl": int(time.time()) + 400 * 86400}
     store.put(item)
     send_job({"type": "report", "reportId": rid})
@@ -762,7 +815,11 @@ def my_evidence(evidence_id: str):
     e = store.get(f"EVID#{check_id(evidence_id, 'evidence id')}")
     if not e or (e.get("uploaderId") != u["id"] and u["role"] == "citizen"):
         raise NotFoundError("no such evidence")
-    return {**public_evidence(e), "moderation": e.get("moderation"), "labels": e.get("labels")}
+    out = {**public_evidence(e), "moderation": e.get("moderation"), "labels": e.get("labels")}
+    if e.get("status") == "unrelated":               # why it was kept private, in the uploader's own words
+        out.update(unrelatedReason=e.get("unrelatedReason"), textWords=e.get("textWords"),
+                   scene=(e.get("ai") or {}).get("scene"))
+    return out
 
 
 @app.post("/v1/secure/lakes/<lake_id>/dossiers")
@@ -890,7 +947,7 @@ def console_queue():
 def review_evidence(evidence_id: str):
     u = user()
     e = store.get(f"EVID#{check_id(evidence_id, 'evidence id')}")
-    if not e or e.get("status") in ("uploading", "blocked"):
+    if not e or e.get("status") in ("uploading", "blocked", "unrelated"):
         raise NotFoundError("no such evidence")
     b = body()
     decision_ = b.get("decision")

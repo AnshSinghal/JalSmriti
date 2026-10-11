@@ -171,6 +171,7 @@ class Accounts:
 
 # ------------------------------------------------------------------------------------------ background work (Step Functions / SQS stand-ins)
 POOL = ThreadPoolExecutor(6, thread_name_prefix="job")
+API_LOCK = threading.Lock()
 STATE = {"dirty": False}
 
 
@@ -396,7 +397,8 @@ class Handler(BaseHTTPRequestHandler):
                               aws_request_id=event["requestContext"]["requestId"], log_group_name="local", log_stream_name="local",
                               invoked_function_arn="arn:aws:lambda:local:000000000000:function:jalsmriti-api-local",
                               get_remaining_time_in_millis=lambda: 29_000)
-        r = api.handler(event, ctx)
+        with API_LOCK:      # one request at a time, as in Lambda: the router keeps the current event in a global
+            r = api.handler(event, ctx)
         body = r.get("body") or ""
         data = base64.b64decode(body) if r.get("isBase64Encoded") else body.encode("utf-8")
         hdrs = {k: v for k, v in (r.get("headers") or {}).items() if k.lower() not in ("content-length", "content-type")}
