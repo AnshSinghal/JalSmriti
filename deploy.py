@@ -30,6 +30,7 @@ from __future__ import annotations
 import argparse
 import base64
 import getpass
+import gzip
 import hashlib
 import io
 import json
@@ -184,6 +185,53 @@ def lambda_settings(session, region: str):
         return ex
 
 
+def resolve_region(session, region: str, explicit: bool) -> str:
+    """The Region asked for; or, when none was asked for and an organisation policy (SCP) blocks the default, the one
+    Region this account may use (AWS's new sign-up gives each account exactly one)."""
+    acct = lambda_settings(session, region)
+    if explicit or not (isinstance(acct, Exception) and blocked_by_org(acct)):
+        return region
+    allowed = next((r for r in HOME_REGIONS if r != region and not isinstance(lambda_settings(session, r), Exception)), None)
+    if allowed:
+        say(f"This AWS account may only create resources in {allowed} (AWS's new sign-up gives each account one Region), "
+            f"so JalSmriti is deployed there.")
+        return allowed
+    return region          # check_region explains what to do
+
+
+def rebind(session, region: str, profile: str | None):
+    """The same credentials (still only in memory) for another Region."""
+    if profile:
+        return boto3.Session(profile_name=profile, region_name=region)
+    c = session.get_credentials().get_frozen_credentials()
+    return boto3.Session(aws_access_key_id=c.access_key, aws_secret_access_key=c.secret_key, aws_session_token=c.token,
+                         region_name=region)
+
+
+def nova_candidates(session, prefix: str) -> list:
+    """Amazon Nova Lite model IDs to try from this Region: the Region's cross-Region profile, any other Nova Lite
+    profiles Bedrock lists here (APAC, Australia, global, Nova 2), then the in-Region model IDs."""
+    found, token = [], None
+    try:
+        bedrock = client(session, "bedrock")
+        for _ in range(10):
+            page = bedrock.list_inference_profiles(typeEquals="SYSTEM_DEFINED", maxResults=1000,
+                                                   **({"nextToken": token} if token else {}))
+            for p in page.get("inferenceProfileSummaries", []):
+                pid = p.get("inferenceProfileId", "")
+                if p.get("status", "ACTIVE") == "ACTIVE" and re.search(r"\.amazon\.nova-(2-)?lite-v1:0$", pid):
+                    found.append(pid)
+            token = page.get("nextToken")
+            if not token:
+                break
+    except Exception:
+        pass                # an older boto3 or no permission to list: the fixed candidates below still apply
+    found.sort(key=lambda m: ("nova-2" in m, m.startswith("global.")))
+    ids = [f"{prefix}.amazon.nova-lite-v1:0"] + found + ["amazon.nova-lite-v1:0", f"{prefix}.amazon.nova-2-lite-v1:0",
+                                                         "global.amazon.nova-2-lite-v1:0", "amazon.nova-2-lite-v1:0"]
+    return list(dict.fromkeys(ids))
+
+
 def check_region(session, region: str):
     """Stop early, with the command to run, when an organisation policy keeps this account out of the region."""
     acct = lambda_settings(session, region)
@@ -231,8 +279,10 @@ def preflight(session, region: str) -> dict:
         pass   # older accounts, or an API this boto3 does not know: nothing to report
     # Amazon Nova on Bedrock (enabled by default since late 2025; cross-region profiles depend on the region)
     prefix = {"us": "us", "ca": "us", "eu": "eu", "ap": "apac"}.get(region.split("-")[0], "us")
-    res["bedrock"], last = None, None
-    for mid in (f"{prefix}.amazon.nova-lite-v1:0", "amazon.nova-lite-v1:0"):
+    candidates = nova_candidates(session, prefix)
+    res["bedrock"], last, tried = None, None, 0
+    for mid in candidates:
+        tried += 1
         try:
             client(session, "bedrock-runtime").converse(
                 modelId=mid, messages=[{"role": "user", "content": [{"text": "Reply with OK."}]}],
@@ -242,6 +292,8 @@ def preflight(session, region: str) -> dict:
         except Exception as ex:
             last = ex
     res["modelPrefix"] = prefix
+    # the model that answered first, then the untried ones as run-time fallbacks
+    res["models"] = ([res["bedrock"]] if res["bedrock"] else []) + candidates[tried:]
     if res["bedrock"]:
         say(f"  Amazon Bedrock: {res['bedrock']} answers")
     else:
@@ -254,9 +306,11 @@ def preflight(session, region: str) -> dict:
         say("  Amazon Translate: works")
         res["translate"] = True
     except ClientError as ex:
-        hint = (" (accounts opened with AWS's new sign-up get Translate with the Paid Plan: AWS Settings > Billing > "
-                "Upgrade)") if blocked_by_org(ex) else ""
-        warn(f"Amazon Translate failed ({ex.response['Error']['Code']}){hint}; letters will be English-only until it works.")
+        plan = (" (on accounts opened with AWS's new sign-up, Translate comes with the Paid Plan: AWS Settings > Billing "
+                "> Upgrade)") if blocked_by_org(ex) else ""
+        nova = "Amazon Nova translates the letters instead, with the same number checks" if res["bedrock"] else \
+            "letters stay in English until it or Bedrock works"
+        warn(f"Amazon Translate is not available ({ex.response['Error']['Code']}){plan}; {nova}.")
         res["translate"] = False
     try:
         client(session, "rekognition").detect_labels(Image={"Bytes": TINY_JPEG}, MaxLabels=1)
@@ -268,11 +322,14 @@ def preflight(session, region: str) -> dict:
         else:
             say("  Amazon Rekognition: reachable")
     try:
-        voices = client(session, "polly").describe_voices(Engine="neural", LanguageCode="hi-IN")["Voices"]
-        if any(v["Id"] == "Kajal" for v in voices):
+        # Kajal and Aditi list Indian English first and Hindi as an additional language
+        voices = client(session, "polly").describe_voices(LanguageCode="hi-IN", IncludeAdditionalLanguageCodes=True)["Voices"]
+        if any(v["Id"] == "Kajal" and "neural" in v.get("SupportedEngines", []) for v in voices):
             say("  Amazon Polly: the Kajal voice reads Hindi and Indian English")
+        elif any(v["Id"] == "Aditi" for v in voices):
+            say("  Amazon Polly: Kajal is not offered here, so 'Listen' uses the standard voice Aditi (Hindi and Indian English)")
         else:
-            warn("Amazon Polly has no neural Kajal voice in this region; 'Listen' will not work here (us-west-2 has it).")
+            warn("Amazon Polly has no Hindi voice in this region; 'Listen' will not work here (us-west-2 has one).")
     except Exception as ex:
         warn(f"Amazon Polly is not available ({str(ex)[:120]}); 'Listen' will not work until it is.")
     try:
@@ -294,11 +351,19 @@ def sha_files(paths) -> str:
     return h.hexdigest()[:16]
 
 
+def layer_extras(name: str) -> list:
+    """Files copied into the layer root next to python/ (backend/layers/<name>/; lib/ becomes /opt/lib on Lambda)."""
+    base = ROOT / "backend" / "layers" / name
+    return sorted(f for f in base.rglob("*") if f.is_file() and f.name != "README.md") if base.exists() else []
+
+
 def build_layer(name: str) -> Path:
     """pip-download Linux wheels for Python 3.12 and unpack them into python/ (the Lambda layer layout)."""
     lock = ROOT / "backend" / "requirements" / f"{name}.lock.txt"
     req = lock if lock.exists() else ROOT / "backend" / "requirements" / f"{name}.txt"
-    tag = hashlib.sha256((req.read_text() + "|".join(PLATFORMS) + "|v4").encode()).hexdigest()[:12]
+    extras = layer_extras(name)
+    extra_sig = sha_files(extras) if extras else ""
+    tag = hashlib.sha256((req.read_text() + "|".join(PLATFORMS) + "|v5|" + extra_sig).encode()).hexdigest()[:12]
     out = BUILD / f"layer-{name}-{tag}.zip"
     if out.exists():
         say(f"  {name} layer: cached ({out.stat().st_size / 1e6:.0f} MB)")
@@ -341,12 +406,17 @@ def build_layer(name: str) -> Path:
             if d.is_dir() and not keep:
                 shutil.rmtree(d, ignore_errors=True)
                 removed += 1
-    size = sum(f.stat().st_size for f in py.rglob("*") if f.is_file())
+    base = ROOT / "backend" / "layers" / name
+    for f in extras:      # e.g. lib/libexpat.so.1, which GDAL needs and the python3.12 runtime does not have
+        dest = stage / f.relative_to(base)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(f, dest)
+    size = sum(f.stat().st_size for f in stage.rglob("*") if f.is_file())
     if size > 245e6:
         die(f"the {name} layer is {size / 1e6:.0f} MB unzipped, over the Lambda limit of 250 MB")
     tmp = out.with_suffix(".tmp")
     with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as z:
-        for f in sorted(py.rglob("*")):
+        for f in sorted(stage.rglob("*")):
             if f.is_file():
                 z.write(f, f.relative_to(stage).as_posix())
     tmp.rename(out)
@@ -441,6 +511,25 @@ def stack_status(cfn, name: str) -> str | None:
         raise
 
 
+def stack_params(cfn, name: str) -> dict:
+    try:
+        s = cfn.describe_stacks(StackName=name)["Stacks"][0]
+    except ClientError:
+        return {}
+    return {p["ParameterKey"]: p.get("ParameterValue") for p in s.get("Parameters", [])}
+
+
+def last_failure_was_cloudfront(cfn, name: str) -> bool:
+    """Did the stack's last create or update roll back because AWS has not verified the account for CloudFront?"""
+    if stack_status(cfn, name) not in ("ROLLBACK_COMPLETE", "UPDATE_ROLLBACK_COMPLETE", "ROLLBACK_FAILED", "CREATE_FAILED"):
+        return False
+    try:
+        events = cfn.describe_stack_events(StackName=name)["StackEvents"][:200]
+    except ClientError:
+        return False
+    return any(CLOUDFRONT_UNVERIFIED in (e.get("ResourceStatusReason") or "") for e in events)
+
+
 def stack_outputs(cfn, name: str) -> dict:
     try:
         s = cfn.describe_stacks(StackName=name)["Stacks"][0]
@@ -529,11 +618,56 @@ def deploy_stack(session, name: str, template_url: str, params: dict) -> dict:
         for e in cfn.describe_stack_events(StackName=name)["StackEvents"]:
             if e["Timestamp"] >= since and e["ResourceStatus"].endswith("FAILED") and e.get("ResourceStatusReason"):
                 reasons.append(f"{e['LogicalResourceId']}: {e['ResourceStatusReason']}")
-        for pat, hint in KNOWN:
-            if any(pat in r for r in reasons):
-                say(f"\n  ! {hint}")
-        die(f"the stack ended in {final}:\n    " + "\n    ".join(reasons[:8] or ["see the CloudFormation console"]))
+        raise StackFailed(final, reasons)
     return stack_outputs(cfn, name)
+
+
+class StackFailed(Exception):
+    def __init__(self, final: str, reasons: list):
+        super().__init__(final)
+        self.final, self.reasons = final, reasons
+
+    def explain(self):
+        for pat, hint in KNOWN:
+            if any(pat in r for r in self.reasons):
+                say(f"\n  ! {hint}")
+        die(f"the stack ended in {self.final}:\n    " + "\n    ".join(self.reasons[:8] or ["see the CloudFormation console"]))
+
+
+CLOUDFRONT_UNVERIFIED = "must be verified before you can add new CloudFront"
+
+
+def public_site_allowed(session, account: str) -> bool:
+    """Without CloudFront the site bucket needs a public-read policy: is that allowed at the account level?"""
+    try:
+        c = client(session, "s3control").get_public_access_block(AccountId=account)["PublicAccessBlockConfiguration"]
+    except ClientError as ex:
+        return ex.response.get("Error", {}).get("Code") == "NoSuchPublicAccessBlockConfiguration"
+    except Exception:
+        return True
+    return not (c.get("BlockPublicPolicy") or c.get("RestrictPublicBuckets"))
+
+
+def deploy_with_fallback(session, project: str, template_url: str, params: dict, account: str, explicit: bool) -> dict:
+    """Deploy; if AWS has not yet verified this new account for CloudFront, serve the site through API Gateway."""
+    try:
+        return deploy_stack(session, project, template_url, params)
+    except StackFailed as ex:
+        unverified = any(CLOUDFRONT_UNVERIFIED in r for r in ex.reasons)
+        if not (unverified and params.get("Website") == "cloudfront" and not explicit):
+            ex.explain()
+    say("\n  AWS has not verified this new account for CloudFront yet (that takes a Support case). The site goes live "
+        "without it: API Gateway serves the website and public data from the site bucket, over HTTPS.")
+    if not public_site_allowed(session, account):
+        die("this account blocks public S3 bucket policies (S3 > Block Public Access settings for this account), so the "
+            "site cannot be served without CloudFront either. Either clear 'Block public access ... through new public "
+            "bucket or access point policies' and '... through any public bucket or access point policies' there, or open "
+            "a case in the AWS Support Center (Account and billing > Account verification) to get CloudFront verified. "
+            "Then run python3 deploy.py again.")
+    try:
+        return deploy_stack(session, project, template_url, {**params, "Website": "api"})
+    except StackFailed as ex:
+        ex.explain()
 
 
 # --------------------------------------------------------------------------------------------- website
@@ -551,19 +685,25 @@ def upload_web(session, out: dict, map_key: str | None, region: str) -> int:
     s3 = client(session, "s3")
     bucket = out["SiteBucketName"]
     n = 0
+    direct = not out.get("DistributionId")     # served by API Gateway, which does not compress: store scripts gzipped
     for f in sorted(dist.rglob("*")):
         if not f.is_file() or f.name == "config.json":
             continue
         key = f.relative_to(dist).as_posix()
         ctype = CTYPES.get(f.suffix.lower()) or mimetypes.guess_type(f.name)[0] or "application/octet-stream"
         cache = "public, max-age=31536000, immutable" if key.startswith("assets/") else "public, max-age=60, must-revalidate"
-        s3.put_object(Bucket=bucket, Key=key, Body=f.read_bytes(), ContentType=ctype, CacheControl=cache)
+        body, extra = f.read_bytes(), {}
+        if direct and key.startswith("assets/") and f.suffix.lower() in (".js", ".mjs", ".css", ".svg", ".json"):
+            body, extra = gzip.compress(body, mtime=0), {"ContentEncoding": "gzip"}
+        s3.put_object(Bucket=bucket, Key=key, Body=body, ContentType=ctype, CacheControl=cache, **extra)
         n += 1
     cfg = {"apiBase": "", "region": region, "userPoolId": out["UserPoolId"], "userPoolClientId": out["UserPoolClientId"],
            "authMode": "cognito", "siteUrl": out["SiteUrl"], "mapKey": map_key, "mapRegion": region,
            "deployedAt": datetime.now(timezone.utc).isoformat(timespec="seconds")}
     s3.put_object(Bucket=bucket, Key="config.json", Body=json.dumps(cfg).encode(), ContentType="application/json",
                   CacheControl="no-cache")
+    if direct:
+        return n
     try:
         client(session, "cloudfront").create_invalidation(DistributionId=out["DistributionId"], InvalidationBatch={
             "Paths": {"Quantity": 3, "Items": ["/index.html", "/config.json", "/"]},
@@ -698,6 +838,52 @@ def follow_preload(session, out: dict, until_area: str | None, max_minutes: int 
         return False
 
 
+def _invoke(lam, function: str, payload: dict) -> dict:
+    r = lam.invoke(FunctionName=function, Payload=json.dumps(payload).encode())
+    body = json.loads(r["Payload"].read() or b"{}")
+    if r.get("FunctionError") or (isinstance(body, dict) and body.get("errorMessage")):
+        raise RuntimeError((body or {}).get("errorMessage") or r.get("FunctionError"))
+    return body
+
+
+def maintain(session, out: dict) -> dict:
+    """After an update, bring data made by older code up to today's rules, without reading imagery again:
+    water bodies without a name of their own are named after what is near them, and photos still awaiting review
+    get today's photo checks (one that is not a photo of the lake is withdrawn on the lake's record)."""
+    from botocore.config import Config
+    lam = session.client("lambda", config=Config(read_timeout=900, connect_timeout=10, retries={"max_attempts": 1}))
+    renamed, done = 0, []
+    for a, it in area_rows(session, out["TableName"]).items():
+        if it.get("status") != "ready":
+            continue
+        try:
+            r = _invoke(lam, out["GeoFunctionName"], {"task": "area.rename", "areaId": a})
+        except Exception as ex:
+            warn(f"naming the water bodies of {a} failed ({str(ex)[:160]}); run  python3 deploy.py --maintain  again")
+            continue
+        renamed += r.get("renamed", 0)
+        done.append(a)
+    if done:
+        say(f"  water bodies with no name of their own named after what is near them: {renamed} renamed in "
+            f"{len(done)} areas")
+    res = {"renamed": renamed, "areas": done, "withdrawn": []}
+    try:
+        r = _invoke(lam, out["EvidenceFunctionName"], {"maintenance": "recheck-evidence"})
+    except Exception as ex:
+        warn(f"the photo re-check failed ({str(ex)[:160]}); run  python3 deploy.py --maintain  again")
+        return res
+    res["withdrawn"] = r.get("withdrawn") or []
+    say(f"  photo re-check: {r.get('checked', 0)} photos awaiting review checked, {len(res['withdrawn'])} withdrawn "
+        "as not photos of the lake")
+    if res["withdrawn"] and out.get("DistributionId"):
+        try:
+            client(session, "cloudfront").create_invalidation(DistributionId=out["DistributionId"], InvalidationBatch={
+                "Paths": {"Quantity": 1, "Items": ["/pub/evidence/*"]}, "CallerReference": f"recheck-{time.time()}"})
+        except ClientError as ex:
+            warn(f"CloudFront invalidation failed ({ex}); withdrawn photos may show from the cache for a while")
+    return res
+
+
 # --------------------------------------------------------------------------------------------- smoke tests
 def _ssl_context():
     """python.org Python on macOS has no CA certificates until 'Install Certificates' is run; boto3's bundle works."""
@@ -745,7 +931,8 @@ def smoke_tests(session, out: dict, passwords: dict, area_ready: bool) -> tuple:
         return ok
 
     s, b = http("GET", f"{site}/v1/health")
-    check("API through CloudFront", s == 200 and isinstance(b, dict) and b.get("ok"), b if s != 200 else "")
+    via = "CloudFront" if out.get("DistributionId") else "API Gateway"
+    check(f"API through {via}", s == 200 and isinstance(b, dict) and b.get("ok"), b if s != 200 else "")
     s, page = http("GET", site)
     check("website loads", s == 200 and b"<html" in (page if isinstance(page, bytes) else b"").lower())
     s, cfg = http("GET", f"{site}/config.json")
@@ -919,6 +1106,9 @@ def summary(out: dict, passwords: dict | None):
     say("\nJalSmriti is live.")
     say(f"  Website   {out.get('SiteUrl')}")
     say(f"  API       {out.get('SiteUrl')}/v1/health")
+    if out.get("Website") == "api":
+        say("  Served by API Gateway without CloudFront, because AWS has not verified this new account for CloudFront "
+            "yet. Once it has (Support Center > Account verification), run  python3 deploy.py --website cloudfront")
     if passwords:
         say("  Demo accounts (sign in with the email; keep these private; show again with --show-passwords):")
         for u, pw in passwords.items():
@@ -942,9 +1132,20 @@ def main():
     ap.add_argument("--areas", help="comma-separated subset of areas to preload")
     ap.add_argument("--web-only", action="store_true")
     ap.add_argument("--no-smoke", action="store_true")
+    ap.add_argument("--maintain", action="store_true",
+                    help="only bring stored data up to today's rules (names of water bodies, photo checks)")
+    ap.add_argument("--website", choices=["cloudfront", "api"],
+                    help="cloudfront (normal) or api (no CloudFront; chosen automatically while AWS has not verified a "
+                         "new account for CloudFront). Run --website cloudfront once AWS has verified the account.")
     args = ap.parse_args()
-    project, region = args.project, args.region
     session = make_session(args)
+    explicit = any(a == "--region" or a.startswith("--region=") for a in sys.argv[1:]) or \
+        bool(os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION"))
+    region = resolve_region(session, args.region, explicit)
+    if region != args.region:
+        args.region = region
+        session = rebind(session, region, args.profile)
+    project = args.project
     cfn = client(session, "cloudformation")
 
     if args.destroy:
@@ -967,6 +1168,12 @@ def main():
             die(f"'{project}' is not deployed in {region}")
         key = map_api_key(session, project, out["SiteUrl"], region)
         say(f"  uploaded {upload_web(session, out, key, region)} files")
+        return
+    if args.maintain:
+        out = stack_outputs(cfn, project)
+        if not out:
+            die(f"'{project}' is not deployed in {region}")
+        maintain(session, out)
         return
     if args.preload:
         out = stack_outputs(cfn, project)
@@ -999,13 +1206,23 @@ def main():
     today = datetime.now(timezone.utc)
     season = today.year if today.month >= 6 else today.year - 1        # the monsoon season being watched
     px = pf.get("modelPrefix", "us")
+    models = pf.get("models") or [f"{px}.amazon.nova-lite-v1:0", "amazon.nova-lite-v1:0"]   # the one that answered first
     params = {"Project": project, "CodeBucket": bucket, **keys, "CurrentSeason": str(season),
-              "TextModelIds": f"{px}.amazon.nova-lite-v1:0,amazon.nova-lite-v1:0,{px}.amazon.nova-pro-v1:0",
-              "VisionModelIds": f"{px}.amazon.nova-lite-v1:0,amazon.nova-lite-v1:0"}
-    if pf.get("bedrock") and pf["bedrock"].startswith("amazon."):     # in-region model answered first: try it first
-        params["TextModelIds"] = f"amazon.nova-lite-v1:0,{px}.amazon.nova-lite-v1:0,amazon.nova-pro-v1:0"
-        params["VisionModelIds"] = f"amazon.nova-lite-v1:0,{px}.amazon.nova-lite-v1:0"
-    out = deploy_stack(session, project, template_url, params)
+              "TextModelIds": ",".join(models[:5] + [f"{px}.amazon.nova-pro-v1:0"]),
+              "VisionModelIds": ",".join(models[:4])}
+    website, explicit_site = args.website, bool(args.website)
+    if not website:
+        prev = stack_params(cfn, project)
+        website = prev.get("Website") or "cloudfront"
+        if website == "cloudfront" and last_failure_was_cloudfront(cfn, project):
+            say("  the last attempt stopped because AWS has not verified this account for CloudFront yet: serving the "
+                "website through API Gateway instead")
+            if not public_site_allowed(session, pf["account"]):
+                warn("this account blocks public S3 bucket policies, so trying CloudFront again")
+            else:
+                website = "api"
+    params["Website"] = website
+    out = deploy_with_fallback(session, project, template_url, params, pf["account"], explicit_site)
     client(session, "ssm").put_parameter(Name=f"/{project}/site-url", Value=out["SiteUrl"], Type="String", Overwrite=True)
     step(5, total, "Website and demo accounts")
     key = map_api_key(session, project, out["SiteUrl"], region)
@@ -1018,6 +1235,7 @@ def main():
         say("  skipped (run  python3 deploy.py --preload  later)")
     elif area_ready:
         say("  areas already loaded (run  python3 deploy.py --preload  to rebuild them)")
+        maintain(session, out)
     else:
         start_preload(session, out, pf["concurrency"], (args.areas or ",".join(AREAS)).split(","))
         say("  reading 40 years of Landsat and Sentinel images; Bengaluru takes about 15-25 minutes ...")
@@ -1037,6 +1255,8 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         say("\nCancelled. Anything already running in AWS continues; re-running python3 deploy.py is always safe.")
         sys.exit(130)
+    except StackFailed as ex:
+        ex.explain()
     except ClientError as ex:
         err = ex.response.get("Error", {})
         hint = (f"\n\nAn organisation policy (SCP) blocks this, and no IAM permission can lift it. {NEW_SIGNUP} Then run  "

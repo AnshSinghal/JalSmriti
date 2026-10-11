@@ -28,6 +28,18 @@ Parameters:
   VisionModelIds:
     Type: String
     Default: "us.amazon.nova-lite-v1:0,amazon.nova-lite-v1:0"
+  Website:
+    Type: String
+    Default: cloudfront
+    AllowedValues: [cloudfront, api]
+    Description: >
+      cloudfront: the website, public data and API behind Amazon CloudFront (the normal setup). api: no CloudFront;
+      API Gateway serves the website and public data straight from the site bucket. deploy.py chooses api only when AWS
+      has not yet verified a brand-new account for CloudFront.
+
+Conditions:
+  UseCdn: !Equals [!Ref Website, cloudfront]
+  NoCdn: !Equals [!Ref Website, api]
 
 Globals:
   Function:
@@ -106,7 +118,11 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub "${Project}-site-${AWS::AccountId}-${AWS::Region}"
-      PublicAccessBlockConfiguration: {BlockPublicAcls: true, BlockPublicPolicy: true, IgnorePublicAcls: true, RestrictPublicBuckets: true}
+      # behind CloudFront the bucket stays private; without CloudFront, API Gateway reads the public website from it
+      PublicAccessBlockConfiguration: !If
+        - UseCdn
+        - {BlockPublicAcls: true, BlockPublicPolicy: true, IgnorePublicAcls: true, RestrictPublicBuckets: true}
+        - {BlockPublicAcls: true, BlockPublicPolicy: false, IgnorePublicAcls: true, RestrictPublicBuckets: false}
       BucketEncryption:
         ServerSideEncryptionConfiguration: [{ServerSideEncryptionByDefault: {SSEAlgorithm: AES256}}]
       OwnershipControls: {Rules: [{ObjectOwnership: BucketOwnerEnforced}]}
@@ -118,14 +134,21 @@ Resources:
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
-          - Sid: CloudFrontReadOnly
-            Effect: Allow
-            Principal: {Service: cloudfront.amazonaws.com}
-            Action: s3:GetObject
-            Resource: !Sub "${SiteBucket.Arn}/*"
-            Condition:
-              StringEquals:
-                AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${Distribution}"
+          - !If
+            - UseCdn
+            - Sid: CloudFrontReadOnly
+              Effect: Allow
+              Principal: {Service: cloudfront.amazonaws.com}
+              Action: s3:GetObject
+              Resource: !Sub "${SiteBucket.Arn}/*"
+              Condition:
+                StringEquals:
+                  AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${Distribution}"
+            - Sid: PublicWebsiteRead          # the same files CloudFront would serve: the website and /pub/ data
+              Effect: Allow
+              Principal: "*"
+              Action: s3:GetObject
+              Resource: !Sub "${SiteBucket.Arn}/*"
 
   # ----------------------------------------------------------------------------------------- queues and topics
   EvidenceDLQ:
@@ -265,7 +288,7 @@ Resources:
           LAKE_SFN_ARN: !Sub "arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:${Project}-lake"
           USER_POOL_ID: !Ref UserPool
           # CloudFront adds this header to API requests; the API refuses requests without it (stack-unique value)
-          ORIGIN_SECRET: !Select [2, !Split ["/", !Ref AWS::StackId]]
+          ORIGIN_SECRET: !If [UseCdn, !Select [2, !Split ["/", !Ref AWS::StackId]], ""]
       Policies:
         - DynamoDBCrudPolicy: {TableName: !Ref Table}
         - SQSSendMessagePolicy: {QueueName: !GetAtt JobsQueue.QueueName}
@@ -363,7 +386,11 @@ Resources:
               Action: [s3:GetObject, s3:PutObject]
               Resource: !Sub "${SiteBucket.Arn}/pub/*"
             - Effect: Allow
-              Action: [rekognition:DetectModerationLabels, rekognition:DetectFaces, rekognition:DetectLabels]
+              Action: [s3:DeleteObject]
+              Resource: !Sub "${SiteBucket.Arn}/pub/evidence/*"
+            - Effect: Allow
+              Action: [rekognition:DetectModerationLabels, rekognition:DetectFaces, rekognition:DetectLabels,
+                       rekognition:DetectText]
               Resource: "*"
             - Effect: Allow
               Action: [bedrock:InvokeModel]
@@ -601,8 +628,78 @@ Resources:
         RetryPolicy: {MaximumRetryAttempts: 2, MaximumEventAgeInSeconds: 3600}
 
   # ----------------------------------------------------------------------------------------- website
+  # Without CloudFront (Website=api), API Gateway proxies the website and /pub/ data from the public site bucket:
+  # /assets/* and /pub/* map to the same keys, a few root files to theirs, and every other path (the app's own
+  # routes) falls through to the $default route, which serves index.html.
+  SiteIndexIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Condition: NoCdn
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: HTTP_PROXY
+      IntegrationMethod: GET
+      IntegrationUri: !Sub "https://${SiteBucket.RegionalDomainName}/index.html"
+      PayloadFormatVersion: "1.0"
+  SiteAssetsIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Condition: NoCdn
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: HTTP_PROXY
+      IntegrationMethod: GET
+      IntegrationUri: !Sub "https://${SiteBucket.RegionalDomainName}/assets/{proxy}"
+      PayloadFormatVersion: "1.0"
+  SitePubIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Condition: NoCdn
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: HTTP_PROXY
+      IntegrationMethod: GET
+      IntegrationUri: !Sub "https://${SiteBucket.RegionalDomainName}/pub/{proxy}"
+      PayloadFormatVersion: "1.0"
+  SiteConfigIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Condition: NoCdn
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: HTTP_PROXY
+      IntegrationMethod: GET
+      IntegrationUri: !Sub "https://${SiteBucket.RegionalDomainName}/config.json"
+      PayloadFormatVersion: "1.0"
+  SiteIconIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Condition: NoCdn
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: HTTP_PROXY
+      IntegrationMethod: GET
+      IntegrationUri: !Sub "https://${SiteBucket.RegionalDomainName}/favicon.svg"
+      PayloadFormatVersion: "1.0"
+  SiteDefaultRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Condition: NoCdn
+    Properties: {ApiId: !Ref HttpApi, RouteKey: $default, Target: !Sub "integrations/${SiteIndexIntegration}"}
+  SiteAssetsRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Condition: NoCdn
+    Properties: {ApiId: !Ref HttpApi, RouteKey: "GET /assets/{proxy+}", Target: !Sub "integrations/${SiteAssetsIntegration}"}
+  SitePubRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Condition: NoCdn
+    Properties: {ApiId: !Ref HttpApi, RouteKey: "GET /pub/{proxy+}", Target: !Sub "integrations/${SitePubIntegration}"}
+  SiteConfigRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Condition: NoCdn
+    Properties: {ApiId: !Ref HttpApi, RouteKey: "GET /config.json", Target: !Sub "integrations/${SiteConfigIntegration}"}
+  SiteIconRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Condition: NoCdn
+    Properties: {ApiId: !Ref HttpApi, RouteKey: "GET /favicon.svg", Target: !Sub "integrations/${SiteIconIntegration}"}
+
   SiteOAC:
     Type: AWS::CloudFront::OriginAccessControl
+    Condition: UseCdn
     Properties:
       OriginAccessControlConfig:
         Name: !Sub "${Project}-site-oac-${AWS::Region}"
@@ -612,6 +709,7 @@ Resources:
 
   SpaRouter:
     Type: AWS::CloudFront::Function
+    Condition: UseCdn
     Properties:
       Name: !Sub "${Project}-spa-router-${AWS::Region}"
       AutoPublish: true
@@ -628,6 +726,7 @@ Resources:
 
   Distribution:
     Type: AWS::CloudFront::Distribution
+    Condition: UseCdn
     Properties:
       DistributionConfig:
         Enabled: true
@@ -732,8 +831,11 @@ Resources:
 
 Outputs:
   SiteUrl:
-    Value: !Sub "https://${Distribution.DomainName}"
+    Value: !If [UseCdn, !Sub "https://${Distribution.DomainName}", !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com"]
+  Website:
+    Value: !Ref Website
   DistributionId:
+    Condition: UseCdn
     Value: !Ref Distribution
   ApiUrl:
     Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com"
