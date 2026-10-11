@@ -1,0 +1,317 @@
+{
+ "about": "Localities reported flooded in widely covered events, geocoded with OpenStreetMap (Photon) to the locality point. Wrong geocodes were removed by hand. Points are locality centres, not exact flood spots.",
+ "localities": [
+  {
+   "city": "blr",
+   "name": "Rainbow Drive Layout, Sarjapur Road",
+   "lat": 12.90759,
+   "lon": 77.688,
+   "event": "Bengaluru floods, Sep 2022 (and Oct 2017 / Nov 2021 for Koramangala and Yelahanka)",
+   "geocodedAs": "Rainbow Drive Playground"
+  },
+  {
+   "city": "blr",
+   "name": "Epsilon Villas, Yemalur",
+   "lat": 12.94789,
+   "lon": 77.68706,
+   "event": "Bengaluru floods, Sep 2022 (and Oct 2017 / Nov 2021 for Koramangala and Yelahanka)",
+   "geocodedAs": "Yemalur Terytary Road"
+  },
+  {
+   "city": "blr",
+   "name": "Mahadevapura",
+   "lat": 12.98961,
+   "lon": 77.6958,
+   "event": "Bengaluru floods, Sep 2022 (and Oct 2017 / Nov 2021 for Koramangala and Yelahanka)",
+   "geocodedAs": "Leo Packers and Movers Mahadevapura"
+  },
+  {
+   "city": "blr",
+   "name": "Panathur",
+   "lat": 12.93515,
+   "lon": 77.70475,
+   "event": "Bengaluru floods, Sep 2022 (and Oct 2017 / Nov 2021 for Koramangala and Yelahanka)",
+   "geocodedAs": "Panathur"
+  },
+  {
+   "city": "blr",
+   "name": "Varthur",
+   "lat": 12.94065,
+   "lon": 77.74699,
+   "event": "Bengaluru floods, Sep 2022 (and Oct 2017 / Nov 2021 for Koramangala and Yelahanka)",
+   "geocodedAs": "Varthur"
+  },
+  {
+   "city": "blr",
+   "name": "Kendriya Vihar, Yelahanka",
+   "lat": 13.10663,
+   "lon": 77.59972,
+   "event": "Bengaluru floods, Sep 2022 (and Oct 2017 / Nov 2021 for Koramangala and Yelahanka)",
+   "geocodedAs": "Kendriya Vihar Apartments"
+  },
+  {
+   "city": "blr",
+   "name": "ST Bed Layout, Koramangala",
+   "lat": 12.92808,
+   "lon": 77.63731,
+   "event": "Bengaluru floods, Sep 2022 (and Oct 2017 / Nov 2021 for Koramangala and Yelahanka)",
+   "geocodedAs": "Essence Unisex Salon And Spa"
+  },
+  {
+   "city": "blr",
+   "name": "Anugraha Layout, Bommanahalli",
+   "lat": 12.90671,
+   "lon": 77.63102,
+   "event": "Bengaluru floods, Sep 2022 (and Oct 2017 / Nov 2021 for Koramangala and Yelahanka)",
+   "geocodedAs": "Bommanahalli"
+  },
+  {
+   "city": "chn",
+   "name": "Velachery",
+   "lat": 12.98017,
+   "lon": 80.22285,
+   "event": "Chennai floods, Dec 2015 and Dec 2023",
+   "geocodedAs": "Velachery"
+  },
+  {
+   "city": "chn",
+   "name": "Madipakkam",
+   "lat": 12.96525,
+   "lon": 80.19163,
+   "event": "Chennai floods, Dec 2015 and Dec 2023",
+   "geocodedAs": "Neuberg Diagnostics Lab - Madipakkam"
+  },
+  {
+   "city": "chn",
+   "name": "Mudichur",
+   "lat": 12.92173,
+   "lon": 80.09368,
+   "event": "Chennai floods, Dec 2015 and Dec 2023",
+   "geocodedAs": "Poorvika Mobiles Tambaram - Mudichur"
+  },
+  {
+   "city": "chn",
+   "name": "West Tambaram",
+   "lat": 12.92565,
+   "lon": 80.10437,
+   "event": "Chennai floods, Dec 2015 and Dec 2023",
+   "geocodedAs": "India Post - Tambaram West Sub Post Office"
+  },
+  {
+   "city": "chn",
+   "name": "Thoraipakkam",
+   "lat": 12.93007,
+   "lon": 80.23002,
+   "event": "Chennai floods, Dec 2015 and Dec 2023",
+   "geocodedAs": "Holiday Inn Express Chennai OMR Thoraipakkam"
+  },
+  {
+   "city": "chn",
+   "name": "Kotturpuram",
+   "lat": 13.01937,
+   "lon": 80.24355,
+   "event": "Chennai floods, Dec 2015 and Dec 2023",
+   "geocodedAs": "Kotturpuram"
+  },
+  {
+   "city": "chn",
+   "name": "Jafferkhanpet",
+   "lat": 13.02995,
+   "lon": 80.20542,
+   "event": "Chennai floods, Dec 2015 and Dec 2023",
+   "geocodedAs": "Jafferkhanpet"
+  },
+  {
+   "city": "chn",
+   "name": "Saidapet",
+   "lat": 13.02082,
+   "lon": 80.22395,
+   "event": "Chennai floods, Dec 2015 and Dec 2023",
+   "geocodedAs": "Saidapet"
+  },
+  {
+   "city": "chn",
+   "name": "Pulianthope",
+   "lat": 13.10084,
+   "lon": 80.26262,
+   "event": "Chennai floods, Dec 2015 and Dec 2023",
+   "geocodedAs": "Pulianthope"
+  },
+  {
+   "city": "chn",
+   "name": "Vyasarpadi",
+   "lat": 13.11305,
+   "lon": 80.25872,
+   "event": "Chennai floods, Dec 2015 and Dec 2023",
+   "geocodedAs": "Vyasarpadi"
+  },
+  {
+   "city": "chn",
+   "name": "Ramapuram, Chennai",
+   "lat": 13.03142,
+   "lon": 80.17891,
+   "event": "Chennai floods, Dec 2015 and Dec 2023",
+   "geocodedAs": "Ramapuram"
+  },
+  {
+   "city": "chn",
+   "name": "Valasaravakkam",
+   "lat": 13.04302,
+   "lon": 80.17521,
+   "event": "Chennai floods, Dec 2015 and Dec 2023",
+   "geocodedAs": "Valasaravakkam"
+  },
+  {
+   "city": "chn",
+   "name": "Mugalivakkam",
+   "lat": 13.02951,
+   "lon": 80.16863,
+   "event": "Chennai floods, Dec 2015 and Dec 2023",
+   "geocodedAs": "Mugalivakkam"
+  },
+  {
+   "city": "chn",
+   "name": "Kolathur, Chennai",
+   "lat": 13.12365,
+   "lon": 80.21288,
+   "event": "Chennai floods, Dec 2015 and Dec 2023",
+   "geocodedAs": "Kolathur"
+  },
+  {
+   "city": "hyd",
+   "name": "Al Jubail Colony, Falaknuma",
+   "lat": 17.32722,
+   "lon": 78.47146,
+   "event": "Hyderabad floods, Oct 2020",
+   "geocodedAs": "Al Jubail Colony"
+  },
+  {
+   "city": "hyd",
+   "name": "Nadeem Colony, Tolichowki",
+   "lat": 17.39894,
+   "lon": 78.41542,
+   "event": "Hyderabad floods, Oct 2020",
+   "geocodedAs": "Tolichowki"
+  },
+  {
+   "city": "hyd",
+   "name": "Chandrayangutta",
+   "lat": 17.3247,
+   "lon": 78.48136,
+   "event": "Hyderabad floods, Oct 2020",
+   "geocodedAs": "Chandrayangutta"
+  },
+  {
+   "city": "hyd",
+   "name": "Saroornagar",
+   "lat": 17.36952,
+   "lon": 78.52526,
+   "event": "Hyderabad floods, Oct 2020",
+   "geocodedAs": "TGSRTC Bus Depot , Hyderabad - 1"
+  },
+  {
+   "city": "hyd",
+   "name": "Moosarambagh",
+   "lat": 17.38857,
+   "lon": 78.51651,
+   "event": "Hyderabad floods, Oct 2020",
+   "geocodedAs": "Moosarambagh Road"
+  },
+  {
+   "city": "hyd",
+   "name": "Chaderghat",
+   "lat": 17.38203,
+   "lon": 78.49253,
+   "event": "Hyderabad floods, Oct 2020",
+   "geocodedAs": "Chaderghat"
+  },
+  {
+   "city": "hyd",
+   "name": "Malakpet",
+   "lat": 17.37717,
+   "lon": 78.4939,
+   "event": "Hyderabad floods, Oct 2020",
+   "geocodedAs": "Malakpet"
+  },
+  {
+   "city": "hyd",
+   "name": "Ramanthapur",
+   "lat": 17.4025,
+   "lon": 78.5367,
+   "event": "Hyderabad floods, Oct 2020",
+   "geocodedAs": "Hyderabad Public School, Ramanthapur"
+  },
+  {
+   "city": "hyd",
+   "name": "Vanasthalipuram",
+   "lat": 17.32595,
+   "lon": 78.56578,
+   "event": "Hyderabad floods, Oct 2020",
+   "geocodedAs": "Petyaari Pet Clinic Grooming and Diagnostics Vanasthalipuram"
+  },
+  {
+   "city": "del",
+   "name": "Yamuna Bazar, Delhi",
+   "lat": 28.662,
+   "lon": 77.23938,
+   "event": "Delhi Yamuna floods, Jul 2023; Gurugram waterlogging 2023-2025",
+   "geocodedAs": "Yamuna Bazar"
+  },
+  {
+   "city": "del",
+   "name": "ITO, Delhi",
+   "lat": 28.62819,
+   "lon": 77.24104,
+   "event": "Delhi Yamuna floods, Jul 2023; Gurugram waterlogging 2023-2025",
+   "geocodedAs": "ITO"
+  },
+  {
+   "city": "del",
+   "name": "Rajghat, Delhi",
+   "lat": 28.63789,
+   "lon": 77.25485,
+   "event": "Delhi Yamuna floods, Jul 2023; Gurugram waterlogging 2023-2025",
+   "geocodedAs": "Rajghat Thermal Power Station"
+  },
+  {
+   "city": "del",
+   "name": "Majnu ka Tilla",
+   "lat": 28.70434,
+   "lon": 77.22449,
+   "event": "Delhi Yamuna floods, Jul 2023; Gurugram waterlogging 2023-2025",
+   "geocodedAs": "DGD, Majnu Ka Tilla"
+  },
+  {
+   "city": "del",
+   "name": "Old Usmanpur",
+   "lat": 28.68452,
+   "lon": 77.25215,
+   "event": "Delhi Yamuna floods, Jul 2023; Gurugram waterlogging 2023-2025",
+   "geocodedAs": "Devta Village Usmanpur"
+  },
+  {
+   "city": "del",
+   "name": "Mayur Vihar Phase 1",
+   "lat": 28.60307,
+   "lon": 77.29249,
+   "event": "Delhi Yamuna floods, Jul 2023; Gurugram waterlogging 2023-2025",
+   "geocodedAs": "Pocket - 4, Mayur Vihar Phase 1"
+  },
+  {
+   "city": "del",
+   "name": "Subhash Chowk, Gurugram",
+   "lat": 28.41798,
+   "lon": 77.05217,
+   "event": "Delhi Yamuna floods, Jul 2023; Gurugram waterlogging 2023-2025",
+   "geocodedAs": "Dr. Subhash Jangid | Orthopedic Doctor | Gurugram"
+  },
+  {
+   "city": "del",
+   "name": "Kirari Suleman Nagar",
+   "lat": 28.67676,
+   "lon": 77.05623,
+   "event": "Delhi Yamuna floods, Jul 2023; Gurugram waterlogging 2023-2025",
+   "geocodedAs": "Kirari Suleman Nagar Drain"
+  }
+ ]
+}
