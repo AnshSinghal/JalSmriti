@@ -11,7 +11,7 @@ const dir = path.join(here, "..", "src", "i18n");
 const out = path.join(here, "..", "..", "backend", "src", "jalsmriti", "data", "ui_strings.json");
 const LANGS = ["en", "hi", "kn", "ta", "te", "ml", "ne"];
 const PREFIXES = ["f.", "lc.", "io.", "grade.", "month.", "place.memory.", "place.radar.", "act.", "report.", "rain.",
-  "speech.", "heat.", "wl.", "signal.", "unit.", "share.", "rti."];
+  "speech.", "heat.", "wl.", "signal.", "unit.", "share.", "rti.", "verdict."];
 
 function parse(file) {
   const text = fs.readFileSync(path.join(dir, file), "utf8");

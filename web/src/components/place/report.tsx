@@ -6,22 +6,24 @@ import { LANGUAGES, useT } from "../../lib/i18n";
 import type { Persona } from "../../lib/persona";
 import type { PlaceReport } from "../../lib/types";
 import { ErrorNote } from "../bits";
+import type { Answers } from "./VerdictCard";
 
 export type ReportState = { s: "idle" } | { s: "working" } | { s: "ready"; r: PlaceReport } | { s: "error"; msg: string };
 
 /** The signed place report: requested in the reader's language for the chosen reader, rendered and signed by the jobs
  *  worker, then offered for download. Asking again for the same check returns the same signed PDF. */
-export function usePlaceReport(lat: number, lon: number, label: string | undefined, persona: Persona) {
+export function usePlaceReport(lat: number, lon: number, label: string | undefined, persona: Persona, answers?: Answers) {
   const { lang } = useT();
   const [st, setSt] = useState<ReportState>({ s: "idle" });
   const alive = useRef(true);
+  const answersKey = answers ? JSON.stringify(answers) : "";
   useEffect(() => () => { alive.current = false; }, []);
-  useEffect(() => { setSt({ s: "idle" }); }, [lang, persona]);
+  useEffect(() => { setSt({ s: "idle" }); }, [lang, persona, answersKey]);
 
   async function start() {
     setSt({ s: "working" });
     try {
-      let r = await api.post<PlaceReport>("/v1/places/report", { lat, lon, label, lang, persona });
+      let r = await api.post<PlaceReport>("/v1/places/report", { lat, lon, label, lang, persona, answers });
       for (let i = 0; i < 60 && r.status === "rendering" && alive.current; i++) {
         await new Promise((res) => setTimeout(res, 2000));
         r = await api.get<PlaceReport>(`/v1/reports/${r.reportId}`);

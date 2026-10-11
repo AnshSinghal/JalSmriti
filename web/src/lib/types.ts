@@ -39,6 +39,18 @@ export type Lake = {
   areaHa: number; lon: number; lat: number; geometry: GeoJSON.Geometry; metrics: LakeMetrics; findings: Finding[];
   frames: (number | "latest")[]; frameUrls: Record<string, string>; latestDate?: string; area: Area | null;
   authorities: Authority[]; laws: string[]; watchers: number; evidenceCount?: number; onDemand?: boolean; updatedAt?: string;
+  insights?: LakeInsights;
+};
+export type Cause = { key: "encroachment" | "drying" | "overgrown" | "inflow" | "sewage" | "holding"; severity: "high" | "medium" | "low"; vars: Record<string, any>; text: string };
+export type LakeInsights = {
+  causes: Cause[];
+  actions: { residents: string[]; authorities: string[] };
+  benefit: null | { lostHa: number; millionLitresLow: number; millionLitresHigh: number; poolsLow: number; poolsHigh: number };
+};
+export type NewsArticle = { title: string; url: string; domain: string; date: string | null; language?: string; country?: string; tags: string[] };
+export type News = {
+  status: "ok" | "stale" | "unavailable" | "none"; query: string | null; articles: NewsArticle[]; fetchedAt?: string | null;
+  window: string; source: string; kind: string; reason?: string; tags: Record<string, number>; locality?: string;
 };
 export type Evidence = {
   evidenceId: string; lakeId: string; areaId?: string; status: string; createdAt: string; capturedAt?: string;
@@ -78,7 +90,7 @@ export type WaterReport = {
   ai?: { waterVisible?: boolean | null; depth?: string | null; summary?: string | null; confidence?: number | null; model?: string };
   status: string; url?: string; thumbUrl?: string; uploader?: string; areaId?: string; note?: string;
   review?: { decision: string; by: string; role: string; at: string; note: string };
-  locationSource?: string; oldPhoto?: boolean; locationMismatch?: boolean;
+  locationSource?: string; oldPhoto?: boolean; locationMismatch?: boolean; hiddenReason?: "text" | "no-water";
 };
 export type Nearby = { count: number; radiusM: number; days: number; items: WaterReport[]; lastSeenAt?: string | null };
 export type RtiRequest = {

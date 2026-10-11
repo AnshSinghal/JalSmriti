@@ -10,6 +10,7 @@ import PeopleReports from "../components/place/PeopleReports";
 import RainStrip from "../components/place/RainStrip";
 import { ReportButton, ReportStatus, usePlaceReport } from "../components/place/report";
 import ThisWeek from "../components/place/ThisWeek";
+import VerdictCard, { useAnswers } from "../components/place/VerdictCard";
 import SearchBox, { placeUrl } from "../components/SearchBox";
 import ShareButtons from "../components/ShareButtons";
 import Timelapse from "../components/Timelapse";
@@ -23,10 +24,10 @@ import { useActivity, useAreas, useJob, useManifest } from "../lib/queries";
 import type { Action, Finding, PlaceResult } from "../lib/types";
 import { metricsFindingsPlace } from "./placeFindings";
 
-function Picker({ mode }: { mode: "place" | "lake" }) {
+function Picker({ mode, start }: { mode: "place" | "lake"; start?: [number, number] }) {
   const { t } = useT();
   const nav = useNavigate();
-  const [center, setCenter] = useState<[number, number]>([77.6, 12.97]);
+  const [center, setCenter] = useState<[number, number]>(start ?? [77.6, 12.97]);
   const mapRef = useRef<any>(null);
   const goTo = (lat: number, lon: number) =>
     nav(mode === "lake" ? `/lake/find?lat=${lat.toFixed(5)}&lon=${lon.toFixed(5)}` : placeUrl({ lat, lon }));
@@ -40,7 +41,7 @@ function Picker({ mode }: { mode: "place" | "lake" }) {
       <h2 className="mt-12 text-[1.6rem]">{t("search.pickTitle")}</h2>
       <p className="muted mt-1">{t("search.pickHint")}</p>
       <div className="relative mt-4 h-[60vh] min-h-[360px] overflow-hidden rounded-xl border border-line">
-        <MapView className="absolute inset-0" center={center} zoom={mode === "lake" ? 12 : 11} satellite={mode === "lake"}
+        <MapView className="absolute inset-0" center={center} zoom={start ? 15 : mode === "lake" ? 12 : 11} satellite={mode === "lake" || !!start}
           onReady={(m) => { mapRef.current = m; m.on("moveend", () => { const c = m.getCenter(); setCenter([c.lng, c.lat]); }); }} />
         <Crosshair size={34} strokeWidth={2.4} className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-built" />
         <div className="absolute inset-x-3 bottom-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-paper/95 px-4 py-3 shadow">
@@ -56,7 +57,8 @@ export default function Place() {
   const [sp] = useSearchParams();
   const lat = Number(sp.get("lat"));
   const lon = Number(sp.get("lon"));
-  if (!sp.get("lat") || !sp.get("lon") || sp.get("pick") || Number.isNaN(lat) || Number.isNaN(lon)) return <Picker mode={sp.get("pick") === "lake" ? "lake" : "place"} />;
+  const valid = !!sp.get("lat") && !!sp.get("lon") && !Number.isNaN(lat) && !Number.isNaN(lon);
+  if (!valid || sp.get("pick")) return <Picker mode={sp.get("pick") === "lake" ? "lake" : "place"} start={valid ? [lon, lat] : undefined} />;
   return <Report key={`${lat},${lon}`} lat={lat} lon={lon} label={sp.get("label") ?? undefined} />;
 }
 
@@ -103,7 +105,8 @@ function Report({ lat, lon, label }: { lat: number; lon: number; label?: string 
   const findings: Finding[] = live?.findings ?? (signals ? metricsFindingsPlace({ ...signals, radarSightings: sightings }) : []);
   const heat = live ? live.heat : job?.heat;
   const nepal = (live?.country ?? area?.country) === "NP";
-  const report = usePlaceReport(lat, lon, placeName, persona);
+  const [answers] = useAnswers();
+  const report = usePlaceReport(lat, lon, placeName, persona, persona === "home" ? answers : undefined);
   const gh = geohash(lat, lon);
   const following = !!act?.follows?.some((f) => f.gh7 === gh);
   const tlFrames = useMemo(() => frames.map((f) => ({
@@ -175,6 +178,7 @@ function Report({ lat, lon, label }: { lat: number; lon: number; label?: string 
               <Progress steps={steps as any} />
             </div>
           )}
+          {live && <VerdictCard lat={lat} lon={lon} persona={persona} onPersona={setPersona} />}
           {live && <RainStrip lat={lat} lon={lon} label={placeName} tier={live.memory.tier} nepal={nepal} />}
           {live?.actions && <ThisWeek actions={live.actions} persona={persona} onPersona={setPersona} placeKey={gh} extra={stepExtra} />}
           {findings.length > 0 && (

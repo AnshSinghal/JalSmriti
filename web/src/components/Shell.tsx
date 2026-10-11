@@ -27,6 +27,7 @@ function NavItems({ onClick }: { onClick?: () => void }) {
       <NavLink to="/place" className={cls} onClick={onClick}>{t("nav.check")}</NavLink>
       <NavLink to="/waterlogging" className={cls} onClick={onClick}>{t("nav.water")}</NavLink>
       <NavLink to="/defend" className={cls} onClick={onClick}>{t("nav.defend")}</NavLink>
+      <NavLink to="/proof" className={cls} onClick={onClick}>{t("nav.proof")}</NavLink>
       <NavLink to="/about" className={cls} onClick={onClick}>{t("nav.about")}</NavLink>
     </>
   );
@@ -139,10 +140,12 @@ export function Footer() {
             <span className="muted">{t("brand.tagline")}</span>
           </div>
           <p className="muted mt-3 text-[15px]">{t("footer.note")}</p>
+          <p className="mt-2 text-[15px]">{t("footer.credit", { name: "Ansh Singhal" })}</p>
         </div>
         <div className="flex flex-wrap gap-x-6 gap-y-2 text-[15px] md:justify-end">
           <Link className="link tap inline-flex items-center" to="/about">{t("footer.methods")}</Link>
           <Link className="link tap inline-flex items-center" to="/about#data">{t("footer.data")}</Link>
+          <Link className="link tap inline-flex items-center" to="/proof">{t("nav.proof")}</Link>
           <Link className="link tap inline-flex items-center" to="/explore">{t("nav.explore")}</Link>
           <Link className="link tap inline-flex items-center" to="/place">{t("nav.check")}</Link>
         </div>

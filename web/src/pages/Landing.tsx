@@ -11,6 +11,7 @@ import { useT } from "../lib/i18n";
 import { usePersona, type Persona } from "../lib/persona";
 import { useAreaLakes, useAreas, useLake, useManifest } from "../lib/queries";
 import type { Area } from "../lib/types";
+import { CASES, CASE_SUMMARY } from "../data/cases";
 
 const MapView = lazy(() => import("../components/MapView"));
 
@@ -174,6 +175,40 @@ function PathChooser({ onPlace, chosen }: { onPlace: (p: Persona) => void; chose
   );
 }
 
+const TEASER = ["velachery", "kendriyavihar", "payakapuram", "nakkhu"];
+const VERDICT_TONE: Record<string, string> = { avoid: "text-built", think: "text-[#9a6206] dark:text-lost", checks: "text-memory", fine: "text-live" };
+
+/** Sixteen places that flooded, and what JalSmriti reads for them: a door to the Past floods page. */
+function ProofTeaser() {
+  const { t } = useT();
+  const g = CASE_SUMMARY.groundRenter as Record<string, number>;
+  const rows = TEASER.map((id) => CASES.find((c) => c.id === id)).filter(Boolean) as typeof CASES;
+  return (
+    <section className="mx-auto mt-24 max-w-[1400px] px-4 sm:px-6">
+      <div className="grid gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] [&>*]:min-w-0">
+        <div>
+          <h2>{t("proofTeaser.title")}</h2>
+          <p className="mt-4 max-w-prose text-[17.5px] text-ink-2">{t("proofTeaser.lede", { n: CASES.length, warned: (g.avoid ?? 0) + (g.think ?? 0) })}</p>
+          <Link to="/proof" className="btn-primary mt-6">{t("proofTeaser.cta", { n: CASES.length })}</Link>
+        </div>
+        <ul className="divide-y divide-line border-y border-line">
+          {rows.map((c) => (
+            <li key={c.id}>
+              <Link to={`/proof#${c.id}`} className="grid gap-1 py-4 hover:text-memory sm:grid-cols-[minmax(0,1fr)_auto] sm:items-baseline sm:gap-6">
+                <span className="min-w-0"><span className="block font-semibold">{c.label}</span><span className="muted text-[14px]">{c.when}</span></span>
+                <span className="text-[14.5px] sm:text-right">
+                  <span className="text-ink-2">{t(`place.memory.${c.tier}` as any)}, {c.index}</span>
+                  <span className={`ml-2 font-semibold ${VERDICT_TONE[c.verdict.ground]}`}>{t(`verdict.level.${c.verdict.ground}` as any)}</span>
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  );
+}
+
 export default function Landing() {
   const { t } = useT();
   const { data: areas } = useAreas();
@@ -206,6 +241,8 @@ export default function Landing() {
       </section>
 
       <Specimen />
+
+      <ProofTeaser />
 
       <section className="mx-auto mt-24 max-w-[1400px] px-4 sm:px-6">
         <div className="max-w-prose">

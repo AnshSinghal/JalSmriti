@@ -4,6 +4,7 @@ import { Bell, BellOff, Camera, FileSearch, FileSignature, Loader2, MapPin, Shie
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ErrorNote, FindingList, GradePlate, SeriesChart, Spinner, Stat } from "../components/bits";
+import { LakeNewsAndRecord, LakeWhy } from "../components/LakeInsights";
 import ListenButton from "../components/ListenButton";
 import MapView from "../components/MapView";
 import RtiDialog, { RtiList } from "../components/RtiDialog";
@@ -40,6 +41,14 @@ function Replaced({ lake }: { lake: Lake }) {
   );
 }
 
+/** Where the name came from: a map's own name, or (when no map names it) what it was named after. */
+function nameNote(src: string, t: ReturnType<typeof useT>["t"]) {
+  if (src === "OpenStreetMap" || src === "GeoNames") return t("lake.nameFrom", { src });
+  if (src === "nearby-lake") return t("lake.nameNearLake");
+  if (src === "area") return t("lake.nameArea");
+  return t("lake.namePlace");
+}
+
 function EvidenceCard({ e }: { e: Evidence }) {
   const { t, lang } = useT();
   const statusColor = e.status === "verified" ? "bg-live/15 text-live" : e.status === "rejected" ? "bg-built/10 text-built" : "bg-paper-3 text-ink-2";
@@ -68,15 +77,23 @@ function UploadDialog({ lake, open, onClose }: { lake: Lake; open: boolean; onCl
   const qc = useQueryClient();
   const [file, setFile] = useState<File | null>(null);
   const [note, setNote] = useState("");
-  const [state, setState] = useState<"idle" | "uploading" | "processing" | "done" | "error">("idle");
+  const [state, setState] = useState<"idle" | "uploading" | "processing" | "done" | "unrelated" | "error">("idle");
   const [msg, setMsg] = useState<string | null>(null);
+  const [saw, setSaw] = useState<string | null>(null);
+  const [reason, setReason] = useState<string>("other");
   const preview = useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
-  useEffect(() => { if (!open) { setFile(null); setNote(""); setState("idle"); setMsg(null); } }, [open]);
+  useEffect(() => { if (!open) { setFile(null); setNote(""); setState("idle"); setMsg(null); setSaw(null); } }, [open]);
+
+  function choose(f: File | null) {
+    setFile(f);
+    if (state === "unrelated" || state === "error") { setState("idle"); setMsg(null); setSaw(null); }
+  }
 
   async function go() {
     if (!file) return;
     if (file.size > 12 * 1024 * 1024) { setState("error"); setMsg(t("ev.tooBig")); return; }
     setState("uploading");
+    setSaw(null);
     try {
       const ctype = ["image/png", "image/webp"].includes(file.type) ? file.type : "image/jpeg";
       const r = await api.spost<{ evidenceId: string; upload: { url: string; fields: Record<string, string> } }>(
@@ -88,6 +105,12 @@ function UploadDialog({ lake, open, onClose }: { lake: Lake; open: boolean; onCl
         const e = await api.sget<any>(`/v1/secure/evidence/${r.evidenceId}`).catch(() => null);
         if (e && e.status && e.status !== "uploading") {
           if (e.status === "blocked") { setState("error"); setMsg(t("ev.blocked")); return; }
+          setSaw(e.ai?.summary ?? null);
+          if (e.status === "unrelated") {
+            setReason(["text", "graphic", "indoor"].includes(e.unrelatedReason) ? e.unrelatedReason : "other");
+            setState("unrelated");
+            return;
+          }
           setState("done");
           qc.invalidateQueries({ queryKey: ["evidence", lake.lakeId] });
           qc.invalidateQueries({ queryKey: ["ledger", lake.lakeId] });
@@ -113,16 +136,29 @@ function UploadDialog({ lake, open, onClose }: { lake: Lake; open: boolean; onCl
           <Dialog.Description className="muted mt-1 text-[15px]">{lake.name}. {t("ev.hint")}</Dialog.Description>
           <label className="mt-4 grid aspect-[4/3] cursor-pointer place-items-center overflow-hidden rounded-lg border-2 border-dashed border-line bg-paper-2 hover:border-memory">
             {preview ? <img src={preview} alt="" className="h-full w-full object-cover" /> : <span className="flex items-center gap-2 text-ink-2"><Camera size={20} />{t("ev.choose")}</span>}
-            <input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" className="sr-only" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+            <input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" className="sr-only" onChange={(e) => choose(e.target.files?.[0] ?? null)} />
           </label>
           <label className="label mt-4" htmlFor="ev-note">{t("ev.note")}</label>
           <textarea id="ev-note" className="field min-h-[80px]" maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} />
           <p className="muted mt-3 text-[13.5px]">{t("ev.privacy")}</p>
-          {state === "done" && <p className="mt-3 rounded-md bg-live/10 px-3 py-2 text-[15px] text-live">{t("ev.done")}</p>}
+          {state === "done" && (
+            <div role="status" className="mt-3 rounded-md bg-live/10 px-3 py-2 text-[15px] text-live">
+              <p>{t("ev.done")}</p>
+              {saw && <p className="mt-1 text-[14px] text-ink-2">{t("ev.saw", { summary: saw })}</p>}
+            </div>
+          )}
+          {state === "unrelated" && (
+            <div role="alert" className="mt-3 rounded-md border border-lost/40 bg-lost/10 px-3 py-2.5 text-[15px]">
+              <p className="font-semibold">{t("ev.unrelated.title")}</p>
+              <p className="mt-1">{t(`ev.unrelated.${reason}` as any)}</p>
+              {saw && <p className="mt-1 text-[14px] text-ink-2">{t("ev.saw", { summary: saw })}</p>}
+              <p className="mt-1 text-[14px] text-ink-2">{t("ev.unrelated.next")}</p>
+            </div>
+          )}
           {state === "error" && <div className="mt-3"><ErrorNote>{msg}</ErrorNote></div>}
           <div className="mt-5 flex justify-end gap-2">
             <button className="btn-ghost" onClick={onClose}>{t("common.close")}</button>
-            <button className="btn-primary" disabled={!file || state === "uploading" || state === "processing" || state === "done"} onClick={go}>
+            <button className="btn-primary" disabled={!file || state === "uploading" || state === "processing" || state === "done" || state === "unrelated"} onClick={go}>
               {(state === "uploading" || state === "processing") && <Loader2 size={16} className="animate-spin" />}
               {state === "uploading" ? t("ev.uploading") : state === "processing" ? t("ev.processing") : t("ev.upload")}
             </button>
@@ -234,7 +270,7 @@ export default function LakePage() {
               {", "}{t(`grade.${m.grade.grade ?? "none"}` as any)}{", "}{t("lake.coords", { lat: lake.lat.toFixed(4), lon: lake.lon.toFixed(4) })}
               {lake.onDemand && <span className="tag ml-2 bg-paper-2">{t("lake.onDemand")}</span>}
             </p>
-            {lake.nameSource && <p className="muted text-[13px]">{t("lake.nameFrom", { src: lake.nameSource })}</p>}
+            {lake.nameSource && <p className="muted text-[13px]">{nameNote(lake.nameSource, t)}</p>}
           </div>
         </div>
         {/* Actions, then share and listen spread under them: the two rows form one block beside the title or below it. */}
@@ -275,6 +311,9 @@ export default function LakePage() {
         </div>
       </div>
 
+      <LakeWhy lake={lake} on={{ photo: () => need(() => setUpload(true)), rti: () => setRti(true), watch: () => need(() => watch(true)),
+        dossier: () => need(() => setDossier(true)) }} />
+
       <section className="mt-14 grid gap-10 lg:grid-cols-[minmax(0,7fr)_minmax(0,4fr)] [&>*]:min-w-0">
         <div>
           <h2 className="text-[1.7rem]">{t("lake.series")}</h2>
@@ -313,6 +352,8 @@ export default function LakePage() {
           <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-4 [&>*]:min-w-0">{evidence.map((e) => <EvidenceCard key={e.evidenceId} e={e} />)}</div>
         ) : <p className="muted mt-3 max-w-prose">{t("lake.evidenceEmpty")}</p>}
       </section>
+
+      <LakeNewsAndRecord lake={lake} evidence={evidence} dossiers={dossiers} rtis={rtis} ledgerEntries={ledger?.entries.length} />
 
       <section className="mt-14 grid gap-10 lg:grid-cols-2 [&>*]:min-w-0">
         <div>

@@ -17,6 +17,7 @@ const Account = lazy(() => import("./pages/Account"));
 const About = lazy(() => import("./pages/About"));
 const Defend = lazy(() => import("./pages/Defend"));
 const LakeFind = lazy(() => import("./pages/LakeFind"));
+const Proof = lazy(() => import("./pages/Proof"));
 const Waterlogging = lazy(() => import("./pages/Waterlogging"));
 
 const qc = new QueryClient({ defaultOptions: { queries: { refetchOnWindowFocus: false, retry: 1 } } });
@@ -59,6 +60,7 @@ export default function App() {
                   <Route path="/console" element={<Console />} />
                   <Route path="/me" element={<Account />} />
                   <Route path="/about" element={<About />} />
+                  <Route path="/proof" element={<Proof />} />
                   <Route path="/defend" element={<Defend />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>

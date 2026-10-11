@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "./api";
-import type { Activity, Area, AreaManifest, Dossier, Evidence, Forecast, Job, Lake, LakeRow, Me, Nearby, RtiRequest, WaterReport } from "./types";
+import type { Activity, Area, AreaManifest, Dossier, Evidence, Forecast, Job, Lake, LakeRow, Me, Nearby, News, RtiRequest, WaterReport } from "./types";
 
 export function useAreas() {
   return useQuery({ queryKey: ["areas"], queryFn: () => api.get<{ areas: Area[] }>("/v1/areas").then((r) => r.areas), staleTime: 60_000 });
@@ -98,4 +98,16 @@ export function useWaterReports(hours: number) {
 
 export function useLakeRti(id?: string) {
   return useQuery({ queryKey: ["rti", id], enabled: !!id, queryFn: () => api.get<{ requests: RtiRequest[] }>(`/v1/lakes/${id}/rti`).then((r) => r.requests) });
+}
+
+/** Recent news naming a lake (GDELT, last three months); cached by the API for 12 hours. */
+export function useLakeNews(id?: string) {
+  return useQuery({ queryKey: ["news", "lake", id], enabled: !!id, queryFn: () => api.get<News>(`/v1/lakes/${id}/news`),
+    staleTime: 30 * 60_000, retry: 0 });
+}
+
+/** Recent news of flooding at a locality (GDELT, last three months). */
+export function useFloodNews(locality?: string | null) {
+  return useQuery({ queryKey: ["news", "floods", locality], enabled: !!locality && locality.length >= 4,
+    queryFn: () => api.get<News>(`/v1/news/floods?locality=${encodeURIComponent(locality!)}`), staleTime: 30 * 60_000, retry: 0 });
 }

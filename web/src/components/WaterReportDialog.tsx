@@ -99,7 +99,8 @@ const POLL_TRIES = 30;
 type Geo = { state: "idle" | "locating" | "located" | "failed"; lat?: number; lon?: number; acc?: number };
 type Outcome =
   | { kind: "live"; report: WaterReport }
-  | { kind: "hidden" | "slow" | "noLocation" | "blocked" }
+  | { kind: "hidden"; reason?: string }
+  | { kind: "slow" | "noLocation" | "blocked" }
   | { kind: "error"; msg: string };
 type Upload = { reportId: string; upload: { url: string; fields: Record<string, string> }; maxBytes: number };
 
@@ -171,7 +172,7 @@ export default function WaterReportDialog({ open, onClose, start, onSee }: {
         if (!rep?.status || rep.status === "uploading") continue;
         setPhase("idle");
         if (rep.status === "live" || rep.status === "verified") setOut({ kind: "live", report: rep });
-        else if (rep.status === "hidden") setOut({ kind: "hidden" });
+        else if (rep.status === "hidden") setOut({ kind: "hidden", reason: rep.hiddenReason });
         else if (rep.status === "no-location") setOut({ kind: "noLocation" });
         else setOut({ kind: "blocked" });    // blocked, unreadable
         if (rep.status === "live" || rep.status === "verified" || rep.status === "hidden") qc.invalidateQueries({ queryKey: ["water"] });
@@ -207,7 +208,7 @@ export default function WaterReportDialog({ open, onClose, start, onSee }: {
                 <div className="min-w-0">
                   {out?.kind === "live"
                     ? <p className="flex items-start gap-2 text-[16.5px] font-semibold leading-snug text-live"><Check size={19} className="mt-0.5 shrink-0" aria-hidden="true" />{t("wl.dlg.done")}</p>
-                    : <p className="text-[15.5px] leading-snug">{out?.kind === "hidden" ? t("wl.dlg.hidden") : t("wl.dlg.slow")}</p>}
+                    : <p className="text-[15.5px] leading-snug">{out?.kind === "hidden" ? t(out.reason === "text" ? "wl.dlg.hiddenText" : "wl.dlg.hidden") : t("wl.dlg.slow")}</p>}
                   <div className="mt-2.5"><DepthTag depth={depth} /></div>
                 </div>
               </div>
