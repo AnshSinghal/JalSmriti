@@ -62,14 +62,27 @@ def _translate_client():
     return boto3.client("translate", region_name=C.REGION)
 
 
+# Set once Amazon Translate refuses this account (for example AWS's new Free Tier, where Translate needs the Paid
+# Plan): every later letter goes straight to Amazon Nova instead of failing on Translate first.
+_TRANSLATE_REFUSED: dict = {"refused": False}
+_REFUSALS = ("AccessDenied", "SubscriptionRequired", "UnrecognizedClient", "not authorized", "service control policy")
+
+
 def _amazon_translate(text: str, target: str) -> str:
+    if _TRANSLATE_REFUSED["refused"]:
+        raise RuntimeError("Amazon Translate is not available to this account")
     out = []
-    for para in text.split("\n"):
-        if not para.strip():
-            out.append(para)
-            continue
-        r = _translate_client().translate_text(Text=protect(para), SourceLanguageCode="en", TargetLanguageCode=target)
-        out.append(unprotect(r["TranslatedText"]))
+    try:
+        for para in text.split("\n"):
+            if not para.strip():
+                out.append(para)
+                continue
+            r = _translate_client().translate_text(Text=protect(para), SourceLanguageCode="en", TargetLanguageCode=target)
+            out.append(unprotect(r["TranslatedText"]))
+    except Exception as ex:
+        if any(s.lower() in str(ex).lower() for s in _REFUSALS):
+            _TRANSLATE_REFUSED["refused"] = True
+        raise
     return "\n".join(out)
 
 

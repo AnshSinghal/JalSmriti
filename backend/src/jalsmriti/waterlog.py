@@ -8,7 +8,8 @@ Upload (API) -> private bucket evidence/waterlogging/{id}.{ext} -> evidence Lamb
      the future, else the upload time; a photo taken over 48 h before its upload is marked old,
   4. Amazon Rekognition blocks explicit content and finds faces, which are blurred in the public copy (no EXIF),
   5. Amazon Nova (vision) says whether standing water is visible, how deep, in one plain sentence. A confident
-     "no water" hides the report until a verifier looks; every other report goes live at once.
+     "no water", or many printed words read by Rekognition (a screenshot or document, not a street), hides the report
+     until a verifier looks; every other report goes live at once.
 NGO verifiers confirm or reject a report (apply_review; who may is decided by Cedar in the API). The national map
 reads the last hours (recent) and a place's page counts the reports nearby (nearby).
 
@@ -52,7 +53,8 @@ IST = timezone(timedelta(hours=5, minutes=30))
 NPT = timezone(timedelta(hours=5, minutes=45))
 
 PUBLIC_FIELDS = ("reportId", "lat", "lon", "seenAt", "createdAt", "capturedAt", "depth", "ai", "status", "url",
-                 "thumbUrl", "uploader", "areaId", "review", "locationSource", "oldPhoto", "locationMismatch", "note")
+                 "thumbUrl", "uploader", "areaId", "review", "locationSource", "oldPhoto", "locationMismatch", "note",
+                 "hiddenReason")
 AI_PUBLIC = ("waterVisible", "depth", "summary", "confidence", "model")
 REVIEW_FIELDS = ("decision", "by", "role", "at", "note")
 
@@ -136,11 +138,16 @@ def process(report_id: str, data: bytes) -> dict:
     url = storage.put_public(f"waterlogging/{report_id}.jpg", big, "image/jpeg", immutable=True)
     turl = storage.put_public(f"waterlogging/{report_id}_t.jpg", thumb, "image/jpeg", immutable=True)
     ai = look(model_jpeg)
+    words = E.text_words(model_jpeg)
     conf = ai.get("confidence")
-    status = "hidden" if ai.get("waterVisible") is False and conf is not None and conf >= HIDE_CONFIDENCE else "live"
+    hidden = ("text" if words is not None and words >= E.TEXT_WORDS_LIMIT       # a screenshot or document, not a street
+              else "no-water" if ai.get("waterVisible") is False and conf is not None and conf >= HIDE_CONFIDENCE
+              else None)
+    status = "hidden" if hidden else "live"
     gh4 = geo.geohash(lat, lon, 4)
     sets.update(status=status, url=url, thumbUrl=turl, width=size[0], height=size[1], facesBlurred=len(boxes), ai=ai,
-                gh4=gh4, GSI1PK=f"WLGEO#{gh4}", GSI1SK=seen, GSI3SK=f"{status}#{created}")
+                textWords=words, hiddenReason=hidden, gh4=gh4, GSI1PK=f"WLGEO#{gh4}", GSI1SK=seen,
+                GSI3SK=f"{status}#{created}")
     done, won = _finish(report_id, sets, remove)
     if won:                                        # else another delivery finished first and did the rest
         store.put(_day_copy(done))

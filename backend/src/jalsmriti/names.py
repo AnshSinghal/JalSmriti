@@ -2,7 +2,12 @@
 
 OpenStreetMap names come from the public Photon geocoder (komoot), asked politely: one request at a time,
 a descriptive User-Agent and a cache. GeoNames (CC BY 4.0, bundled for India and Nepal) is the fallback.
-When neither knows the water body, it is called "Water body near <locality>".
+When neither knows the water body, it is named after what is near it (fallback_name), never just "unnamed":
+  1. the nearest named lake within 2 km: "Water body near Bellandur Lake" or "Water body 1.6 km east of ...",
+  2. the locality the geocoder gave for its own position: "Water body near Mahadevapura",
+  3. the nearest named lake within 6 km,
+  4. the locality of the nearest named neighbour within 3 km: "Water body in Varthur",
+  5. the area: "Water body in Bengaluru".
 """
 from __future__ import annotations
 
@@ -128,3 +133,96 @@ def search(q: str, limit: int = 6, bias: tuple[float, float] | None = None) -> l
 
 def _strip(d: dict) -> dict:
     return {k: d.get(k) for k in ("locality", "city", "county", "state", "country", "countryCode") if d.get(k)}
+
+
+# ------------------------------------------------------------------------------------------ named after what is near
+REAL_SOURCES = ("OpenStreetMap", "GeoNames")
+COMPASS = ("north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west")
+NEAR_M = 1000.0            # within this: "Water body near Bellandur Lake"
+PREFER_LAKE_M = 2000.0     # a named lake this close beats the locality
+LAKE_MAX_M = 6000.0        # further than this, a lake does not describe where a water body is
+PLACE_MAX_M = 3000.0
+_DEG = 0.06                # a quick box test before measuring (about 6.6 km)
+
+
+def direction(lat: float, lon: float, from_lat: float, from_lon: float) -> str:
+    """Where (lat, lon) lies seen from (from_lat, from_lon), to 8 compass points."""
+    dy = lat - from_lat
+    dx = (lon - from_lon) * math.cos(math.radians((lat + from_lat) / 2))
+    ang = (math.degrees(math.atan2(dx, dy)) + 360.0) % 360.0          # 0 = north, 90 = east
+    return COMPASS[int((ang + 22.5) // 45) % 8]
+
+
+def nearest(lat: float, lon: float, anchors, max_m: float):
+    """(distance in m, anchor) for the nearest of `anchors` [(lat, lon, label), ...] within max_m, else None."""
+    best = None
+    for a in anchors:
+        if abs(a[0] - lat) > _DEG or abs(a[1] - lon) > _DEG:
+            continue
+        d = haversine_m(lat, lon, a[0], a[1])
+        if d <= max_m and (best is None or d < best[0]):
+            best = (d, a)
+    return best
+
+
+def near_label(lat: float, lon: float, anchor, dist_m: float, noun: str = "Water body") -> str:
+    if dist_m <= NEAR_M:
+        return f"{noun} near {anchor[2]}"
+    return f"{noun} {dist_m / 1000:.1f} km {direction(lat, lon, anchor[0], anchor[1])} of {anchor[2]}"
+
+
+def geonames_anchors(bbox, pad: float = _DEG) -> list[tuple[float, float, str]]:
+    """Named water bodies from GeoNames inside [west, south, east, north] widened by `pad` degrees."""
+    w, s, e, n = bbox
+    return [(la, lo, name) for la, lo, name, _code in _geonames()
+            if s - pad <= la <= n + pad and w - pad <= lo <= e + pad]
+
+
+def fallback_name(lat: float, lon: float, kind: str, lakes, places, generated: dict | None, area_name: str | None
+                  ) -> dict:
+    """{"name", "source", "lake"} for a water body that has no name of its own.
+
+    lakes:  named water bodies nearby, [(lat, lon, name), ...] (OpenStreetMap and GeoNames names only),
+    places: localities the geocoder gave for named neighbours, [(lat, lon, locality), ...],
+    generated: what water_body_name() made from the geocoder's locality for this body ("Water body near X"), if any.
+    source is "nearby-lake", "nearby-place", "area" or "none"; "lake" is (distance, anchor) of the nearest named lake
+    within 6 km or None (distinct() uses it to tell apart water bodies that got the same name)."""
+    noun = "River stretch" if kind == "river" else "Water body"
+    lake = nearest(lat, lon, lakes, LAKE_MAX_M)
+    out = {"lat": lat, "lon": lon, "noun": noun, "lake": lake}
+    loc = (generated or {}).get("locality") or (generated or {}).get("city")
+    place = None if lake or loc else nearest(lat, lon, places, PLACE_MAX_M)
+    if lake and lake[0] <= PREFER_LAKE_M:
+        name, source = near_label(lat, lon, lake[1], lake[0], noun), "nearby-lake"
+    elif loc:
+        name, source = f"{noun} near {loc}", "nearby-place"
+    elif lake:
+        name, source = near_label(lat, lon, lake[1], lake[0], noun), "nearby-lake"
+    elif place:
+        name, source = f"{noun} in {place[1][2]}", "nearby-place"
+    elif area_name:
+        name, source = f"{noun} in {area_name}", "area"
+    else:
+        name, source = f"Unnamed {noun.lower()}", "none"
+    return {**out, "name": name, "source": source}
+
+
+def distinct(named: list[dict]) -> None:
+    """Tell apart water bodies that got the same name (in place), using the nearest named lake: "Water body near
+    Bellandur Lake" twice becomes "Water body north of Bellandur Lake" and "Water body south-east of ..."; a repeated
+    locality name becomes "Water body 3.4 km south of Varthur Lake". Names that are still the same stay so.
+
+    named: fallback_name() results."""
+    seen: dict[str, int] = {}
+    for n in named:
+        seen[n["name"]] = seen.get(n["name"], 0) + 1
+    for n in named:
+        lake = n.get("lake")
+        if seen[n["name"]] < 2 or not lake:
+            continue
+        d, a = lake
+        side = direction(n["lat"], n["lon"], a[0], a[1])
+        if d <= NEAR_M:
+            n["name"], n["source"] = f"{n['noun']} {side} of {a[2]}", "nearby-lake"
+        else:
+            n["name"], n["source"] = f"{n['noun']} {d / 1000:.1f} km {side} of {a[2]}", "nearby-lake"

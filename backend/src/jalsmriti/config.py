@@ -123,7 +123,7 @@ BEDROCK_TRANSLATED = ("ne", "as", "or")      # not in Amazon Translate: Nova tra
 # per person (signed in) or per client address (anonymous), per day ...
 RATE_LIMIT_PER_DAY = {"evidence": 30, "dossier": 10, "place": 25, "lake": 10, "watch": 30, "geocode": 600,
                       "follow": 20, "heads-up-test": 3, "report": 20, "speech": 30, "rti": 10, "waterlog": 10,
-                      "forecast": 300,
+                      "forecast": 300, "news": 120,
                       # ... and for the whole site per day: these bound the satellite work anyone can start
                       "place-all": int(os.environ.get("PLACE_CHECKS_PER_DAY", "200")),
                       "lake-all": int(os.environ.get("LAKE_ANALYSES_PER_DAY", "40")),

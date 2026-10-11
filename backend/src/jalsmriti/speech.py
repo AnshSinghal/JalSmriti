@@ -17,6 +17,8 @@ from . import storage
 
 VOICE = "Kajal"
 ENGINE = "neural"
+# where Kajal's neural voice is not offered, the standard voice Aditi (also Hindi and Indian English) reads instead
+FALLBACK_VOICE, FALLBACK_ENGINE = "Aditi", "standard"
 LANGUAGE_CODES = {"hi": "hi-IN", "en": "en-IN"}
 MAX_CHARS = 2900      # SynthesizeSpeech takes at most 3,000 billed characters of plain text per request
 # a sentence ends at . ! ? or the Devanagari danda (U+0964, U+0965), with any closing quote or bracket
@@ -89,13 +91,29 @@ def synthesize(text: str, lang: str) -> dict:
     local = bool(C.LOCAL)
     path = f"speech/{key}.{'wav' if local else 'mp3'}"
     cached = storage.exists(C.SITE_BUCKET or "site", storage.public_key(path))
+    voice, engine = VOICE, ENGINE
     if not cached:
         if local:
             audio, content_type = chime(), "audio/wav"
         else:
-            r = _polly().synthesize_speech(Text=text, TextType="text", VoiceId=VOICE, Engine=ENGINE,
-                                           LanguageCode=LANGUAGE_CODES[lang], OutputFormat="mp3")
-            audio, content_type = r["AudioStream"].read(), "audio/mpeg"
+            audio, voice, engine = _speak(text, LANGUAGE_CODES[lang])
+            content_type = "audio/mpeg"
         storage.put_public(path, audio, content_type, immutable=True)
-    return {"url": "/" + storage.public_key(path), "voice": VOICE, "engine": ENGINE, "chars": len(text),
+    return {"url": "/" + storage.public_key(path), "voice": voice, "engine": engine, "chars": len(text),
             "cached": cached, "local": local}
+
+
+def _speak(text: str, language_code: str) -> tuple[bytes, str, str]:
+    """MP3 from Kajal (neural); from Aditi (standard) where this Region does not offer Kajal's neural voice."""
+    from botocore.exceptions import ClientError
+    try:
+        r = _polly().synthesize_speech(Text=text, TextType="text", VoiceId=VOICE, Engine=ENGINE,
+                                       LanguageCode=language_code, OutputFormat="mp3")
+        return r["AudioStream"].read(), VOICE, ENGINE
+    except ClientError as ex:
+        if ex.response.get("Error", {}).get("Code") not in ("EngineNotSupportedException", "ValidationException",
+                                                             "InvalidParameterValueException", "LanguageNotSupportedException"):
+            raise
+    r = _polly().synthesize_speech(Text=text, TextType="text", VoiceId=FALLBACK_VOICE, Engine=FALLBACK_ENGINE,
+                                   LanguageCode=language_code, OutputFormat="mp3")
+    return r["AudioStream"].read(), FALLBACK_VOICE, FALLBACK_ENGINE

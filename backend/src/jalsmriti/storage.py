@@ -140,6 +140,15 @@ def put_public(path: str, data: bytes, content_type: str, immutable: bool = Fals
     return "/" + key
 
 
+def delete_public(path: str) -> None:
+    """Remove an object under SITE_BUCKET/pub/ (a copy CloudFront already cached stays until an invalidation)."""
+    key = public_key(path)
+    if LOCAL_DIR:
+        _local(C.SITE_BUCKET or "site", key).unlink(missing_ok=True)
+        return
+    _s3().delete_object(Bucket=C.SITE_BUCKET, Key=key)
+
+
 def put_public_json(path: str, obj, max_age: int = 300) -> str:
     key = public_key(path)
     put(C.SITE_BUCKET or "site", key,

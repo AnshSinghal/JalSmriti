@@ -30,6 +30,7 @@ LOST = (217, 144, 26)             # water that has gone
 MEMORY = (31, 79, 153)            # remembered water
 PAPER2 = (232, 238, 236)
 TIER_COLOR = {"strong": BUILT, "some": LOST, "little": MEMORY}
+LEVEL_COLOR = {"avoid": BUILT, "think": LOST, "checks": MEMORY, "fine": (46, 125, 72)}
 SEVERITY_COLOR = {"high": BUILT, "medium": LOST}
 HEAT_RAMP = ("#313695", "#74add1", "#fee090", "#f46d43", "#a50026")
 # alias for the page count: one character, so fpdf2 reserves the width of one digit and right-aligned page labels
@@ -398,6 +399,61 @@ def _memory(pdf: _ReportDoc, d: dict, L: dict):
     pdf.set_y(y0 + H)
 
 
+def _verdict(pdf: _ReportDoc, d: dict, L: dict):
+    """Our read for a family about to rent or buy: the level and headline on a panel edged in the level's colour,
+    then why, what is in its favour (+) and against it (-), and the note that it is not a survey or advice."""
+    v = d.get("verdict")
+    if not isinstance(v, dict) or not _s(v.get("headline")):
+        return
+    st, W, x0 = pdf.st, pdf.epw, pdf.l_margin
+    color = LEVEL_COLOR.get(v.get("level"), MUTED)
+    pad, edge = 3.6, 1.4
+    inner = W - 2 * pad - edge
+    level, head = _s(v.get("levelLabel")), _s(v.get("headline"))
+    lh_level = _measure(pdf, level, inner, st.body, True)[0] if level else 0.0
+    lh_head = _measure(pdf, head, inner, st.body + 1.2, True)[0]
+    panel = lh_level + (1.0 if level else 0.0) + lh_head + 2 * pad
+    _heading(pdf, _s(v.get("title")) or "Our read", need=panel)
+    y0 = pdf.get_y()
+    pdf.set_fill_color(*_mix(color, WHITE, 0.10))
+    pdf.rect(x0, y0, W, panel, style="F", round_corners=True, corner_radius=2.0)
+    pdf.set_fill_color(*color)
+    pdf.rect(x0, y0, edge, panel, style="F")
+    pdf.set_y(y0 + pad)
+    if level:
+        _write(pdf, level, x0 + edge + pad, inner, st.body, bold=True, color=color)
+        pdf.set_y(pdf.get_y() + 1.0)
+    _write(pdf, head, x0 + edge + pad, inner, st.body + 1.2, bold=True)
+    pdf.set_y(y0 + panel + 1.6)
+    ind = 5.0
+    tw = W - ind
+    for title_key, items, mark, mcolor in (("whyTitle", v.get("why"), "", INK), ("prosTitle", v.get("pros"), "+", (46, 125, 72)),
+                                           ("consTitle", v.get("cons"), "-", BUILT)):
+        items = _texts(items)
+        if not items:
+            continue
+        title = _s(v.get(title_key))
+        if title:
+            _advance(pdf, 1.4, _measure(pdf, title, W, st.small, True)[0] + _measure(pdf, items[0], tw, st.body)[0])
+            _write(pdf, title, x0, W, st.small, bold=True, color=MUTED)
+            pdf.set_y(pdf.get_y() + 0.6)
+        for i, text in enumerate(items):
+            h, lh = _measure(pdf, text, tw, st.body)
+            _advance(pdf, st.item * 0.7 if i else 0.0, h)
+            y = pdf.get_y()
+            if mark:
+                _label(pdf, mark, x0, y, ind, lh, st.body, bold=True, color=mcolor)
+                pdf.set_y(y)
+            else:
+                pdf.set_fill_color(*MUTED)
+                pdf.circle(x0 + 1.2, y + lh / 2, 0.6, style="F")
+            _write(pdf, text, x0 + ind, tw, st.body)
+    note = _s(v.get("note"))
+    if note:
+        _advance(pdf, 1.8, _measure(pdf, note, W, st.small)[0])
+        _write(pdf, note, x0, W, st.small, color=MUTED)
+
+
 def _findings(pdf: _ReportDoc, d: dict, L: dict):
     raw = d.get("findings") if isinstance(d.get("findings"), (list, tuple)) else []
     items = [(_s(f.get("text")), f.get("severity")) if isinstance(f, dict) else (_s(f), "info") for f in raw]
@@ -743,7 +799,7 @@ def _layout(d: dict, L: dict, st: _Style, assets: dict, break_before: str | None
     pdf.alias_nb_pages(TOTAL_ALIAS)
     pdf.set_lang(lang)
     pdf.set_title(" - ".join(s for s in (L["docTitle"], _s(d.get("title"))) if s))
-    pdf.set_author("JalSmriti")
+    pdf.set_author("JalSmriti, made by Ansh Singhal")
     pdf.add_page()
     # footer: one line when a slightly smaller size allows it (no lone word on a second line), else wrapped, and its
     # height reserved above the bottom edge
@@ -764,6 +820,7 @@ def _layout(d: dict, L: dict, st: _Style, assets: dict, break_before: str | None
     _title(pdf, d, L)
     sections = (
         ("memory", lambda: _memory(pdf, d, L)),
+        ("verdict", lambda: _verdict(pdf, d, L)),
         ("findings", lambda: _findings(pdf, d, L)),
         ("timelapse", lambda: _timelapse(pdf, L, assets["frames"])),
         ("radar", lambda: _radar(pdf, d, L)),
@@ -800,7 +857,9 @@ def render(d: dict) -> bytes:
     payload, key, check, checkHow, footer, and page with {n} and {total}), tier, tierLabel, indexLabel, index,
     explain, validation, findings [{text, severity}], frames [{label, image}] (up to six, oldest first),
     radar {sentence, dates} | None, heat {lines, image, scaleLabel, lo, hi} | None, reports {sentence, items} | None,
-    actions {title, items}, questions | None, limits, sources, payloadSha256, keyFingerprint, verifyUrl and qrPng.
+    actions {title, items}, questions | None, limits, sources, payloadSha256, keyFingerprint, verifyUrl and qrPng,
+    and for a family about to rent or buy, verdict {title, level, levelLabel, headline, whyTitle, why, prosTitle, pros,
+    consTitle, cons, note} | None.
     A missing label falls back to English; empty sections and unreadable pictures are left out."""
     L = _labels(d)
     frames = d.get("frames") if isinstance(d.get("frames"), (list, tuple)) else []

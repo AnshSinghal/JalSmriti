@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from . import actions as ACT
 from . import strings
+from . import verdict as V
 from .strings import day, num
 
 REPORT_EN = {
@@ -137,6 +138,7 @@ def assemble(report: dict, place: dict, *, frames: list[tuple[str, bytes]], heat
                                depth=T(lang, f"report.depth.{r.get('depth') or 'unknown'}"))
                              for r in (nearby.get("items") or [])[:6]]}
     steps = ACT.for_place(place)[persona]
+    verdict = verdict_block(report, place, (nearby or {}).get("count") or 0, lang) if persona == "home" else None
     label = report.get("label") or (place.get("label") or {}).get("label") or \
         T(lang, "report.coords", lat=f"{float(report['lat']):.4f}", lon=f"{float(report['lon']):.4f}")
     return {
@@ -148,12 +150,27 @@ def assemble(report: dict, place: dict, *, frames: list[tuple[str, bytes]], heat
         "findings": [{"text": strings.finding_text(f, lang), "severity": f.get("severity", "info")}
                      for f in (place.get("findings") or [])],
         "frames": [{"label": lbl, "image": img} for lbl, img in frames],
-        "radar": radar, "heat": heat_block, "reports": reports,
+        "radar": radar, "heat": heat_block, "reports": reports, "verdict": verdict,
         "actions": {"title": T(lang, f"report.actions.{persona}"), "items": [strings.action_text(a, lang) for a in steps]},
         "questions": [T(lang, f"report.q{i}") for i in (1, 2, 3, 4)] if persona == "home" else None,
         "limits": [T(lang, f"report.limit{i}") for i in (1, 2, 3, 4)], "sources": T(lang, "report.sources"),
         "payloadSha256": payload_sha256, "keyFingerprint": key_fingerprint, "verifyUrl": verify_url, "qrPng": qr_png,
     }
+
+
+def verdict_block(report: dict, place: dict, reports: int, lang: str) -> dict | None:
+    """Our read in words, for a report made with the family's four answers (None without them)."""
+    if not report.get("answers"):
+        return None
+    v = V.build(place, report["answers"], reports)
+
+    def w(key):
+        return strings.t(lang, key, en=V.VERDICT_EN.get(key))
+    return {"title": w("verdict.title"), "level": v["level"], "levelLabel": w(f"verdict.level.{v['level']}"),
+            "headline": V.text(v["headline"], lang), "whyTitle": w("verdict.why"),
+            "why": [V.text(x, lang) for x in v["why"]], "prosTitle": w("verdict.pros"),
+            "pros": [V.text(x, lang) for x in v["pros"]], "consTitle": w("verdict.cons"),
+            "cons": [V.text(x, lang) for x in v["cons"]], "note": V.text(v["note"], lang)}
 
 
 def payload(report: dict, place: dict) -> dict:
@@ -172,4 +189,5 @@ def payload(report: dict, place: dict) -> dict:
         "frames": [f.get("season") for f in (place.get("frames") or [])],
         "actions": [a["key"] for a in ACT.for_place(place)[persona]],
         "lang": report.get("lang"), "persona": persona,
+        "answers": report.get("answers") if persona == "home" else None,
     }

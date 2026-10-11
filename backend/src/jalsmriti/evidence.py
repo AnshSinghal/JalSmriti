@@ -3,10 +3,16 @@
 For every upload:
   1. SHA-256 of the original bytes (the original stays private and unchanged),
   2. EXIF capture time, camera and GPS; the GPS is checked against the lake's historic outline,
-  3. Amazon Rekognition rejects explicit content and finds faces, which are blurred in the public copy,
-  4. Amazon Nova (vision) describes what the photo shows in fixed categories (dumping, sewage, construction ...),
+  3. Amazon Rekognition rejects explicit content,
+  4. is it a photo of the place at all? Three independent signals (relevance()): how many printed words Rekognition
+     reads (DetectText: a screenshot, document or poster has many), Rekognition's labels (Poster, Document ... and no
+     outdoor scene), and Amazon Nova's own answer to "is this a real photo taken at a lake, its banks or the land
+     around it?". An upload that fails is kept private as "unrelated", with the reason, and never reaches the
+     public page, the ledger or the verifiers' queue,
+  5. Rekognition finds faces, which are blurred in the public copy,
+  6. Amazon Nova (vision) describes what the photo shows in fixed categories (dumping, sewage, construction ...),
      with Rekognition labels as an independent second signal,
-  5. a public copy is published without EXIF (no phone metadata leaks), plus a thumbnail.
+  7. a public copy is published without EXIF (no phone metadata leaks), plus a thumbnail.
 The AI only triages; a verifier (NGO account) confirms or rejects, and that decision is what counts.
 """
 from __future__ import annotations
@@ -137,31 +143,127 @@ def categories_from_labels(lbls: list[dict]) -> list[str]:
     return [cat for cat, hints in LABEL_HINTS.items() if names.intersection(hints)]
 
 
+# ------------------------------------------------------------------------------ is it a photo of the place at all?
+TEXT_WORDS_LIMIT = 25          # printed words Rekognition reads: a lake's signboard has a few, a screenshot many
+TEXT_MIN_CONFIDENCE = 80
+UNRELATED_CONFIDENCE = 0.6     # Nova must be at least this sure that the image is not a photo of the place
+LABEL_MIN_CONFIDENCE = 70
+# Rekognition labels of made images (documents, screenshots, posters, drawings) ...
+GRAPHIC_LABELS = frozenset((
+    "Text", "Document", "Poster", "Page", "Flyer", "Brochure", "Advertisement", "Diagram", "Screenshot", "Chart",
+    "Plot", "Logo", "Menu", "Webpage", "Web Page", "File", "Paper", "Letter", "Book", "Publication", "Newspaper",
+    "Magazine", "Business Card", "Id Cards", "Receipt", "Invoice", "Graphics", "Drawing", "Cartoon", "Illustration",
+    "Comics", "Art", "Pattern", "Number", "Symbol", "Trademark", "Emblem", "Electronics", "Computer Hardware",
+    "Monitor", "Screen", "Phone", "Mobile Phone"))
+# ... and of the outdoor scenes a lake photo shows (any one of them and the image is not treated as a made image)
+SCENE_LABELS = frozenset((
+    "Outdoors", "Nature", "Water", "Lake", "Pond", "River", "Shoreline", "Waterfront", "Wetland", "Swamp", "Marsh",
+    "Puddle", "Flood", "Land", "Landscape", "Scenery", "Grass", "Vegetation", "Tree", "Plant", "Sky", "Soil", "Dirt",
+    "Mud", "Sand", "Rock", "Field", "Ground", "Road", "Street", "Path", "City", "Urban", "Neighborhood",
+    "Construction", "Building", "Rubble", "Garbage", "Trash", "Litter", "Bird", "Waterfowl", "Fish", "Cattle",
+    "Weather", "Cloud", "Shore", "Coast", "Bank"))
+# ... and of water itself: when Rekognition sees water, a "no" from Nova alone is not enough (a verifier decides)
+WATER_LABELS = frozenset(("Water", "Lake", "Pond", "River", "Shoreline", "Waterfront", "Wetland", "Swamp", "Marsh",
+                          "Puddle", "Flood", "Canal", "Reservoir"))
+SCENES = ("lake_or_pond", "wetland_or_marsh", "dry_lake_bed", "river_or_canal", "drain_or_outlet", "street_or_buildings",
+          "construction_site", "indoor", "screenshot_or_document", "poster_or_graphic", "other")
+SCENE_REASONS = {"indoor": "indoor", "screenshot_or_document": "text", "poster_or_graphic": "graphic"}
+UNRELATED_REASONS = ("text", "graphic", "indoor", "other")
+
+
+def text_words(data: bytes) -> int | None:
+    """Printed words Amazon Rekognition reads in the photo (DetectText reads at most 100); None if the check failed."""
+    if C.LOCAL:
+        return 0
+    try:
+        r = _rek().detect_text(Image={"Bytes": data},
+                               Filters={"WordFilter": {"MinConfidence": TEXT_MIN_CONFIDENCE}})
+    except Exception as ex:                 # the other two signals still decide
+        log.warning("text detection failed: %s", ex)
+        return None
+    return sum(1 for t in r.get("TextDetections", [])
+               if t.get("Type") == "WORD" and t.get("Confidence", 0) >= TEXT_MIN_CONFIDENCE)
+
+
+def relevance(tri: dict, words: int | None, lbls: list[dict]) -> str | None:
+    """Why the upload is not a photo of the lake, its banks or the land around it ("text", "graphic", "indoor" or
+    "other"), or None when it may be one (then a verifier still decides).
+
+    Rekognition's signals come first because they cannot be talked into seeing a lake: many printed words or the
+    labels of a made image, with no outdoor scene at all. Nova's answer counts when it is sure, unless Rekognition
+    sees water (two models disagreeing is a question for a person)."""
+    names = {l.get("name") for l in lbls or [] if (l.get("confidence") or 0) >= LABEL_MIN_CONFIDENCE}
+    outdoors, water = bool(names & SCENE_LABELS), bool(names & WATER_LABELS)
+    site, conf, scene = tri.get("sitePhoto"), tri.get("confidence"), tri.get("scene")
+    if words is not None and words >= TEXT_WORDS_LIMIT and not outdoors:
+        return "text"
+    if names & GRAPHIC_LABELS and not outdoors and site is not True:
+        return "graphic"
+    if site is False and conf is not None and conf >= UNRELATED_CONFIDENCE and not water:
+        return SCENE_REASONS.get(scene, "other")
+    return None
+
+
 TRIAGE_PROMPT = (
-    "You are helping citizens document problems at a lake, tank or wetland in India or Nepal. Look at the photo and "
-    "answer ONLY with a JSON object with keys: categories (array, choose from: dumping, sewage, construction, "
-    "fencing, weeds, dead_fish, foam, dry_bed, healthy, other), summary (one plain sentence, max 30 words, "
-    "describing only what is visible, no guesses about who is responsible), water_visible (true/false), "
-    "confidence (0 to 1). Do not identify people.")
+    "Someone uploaded this image as evidence about a lake, tank or wetland in India or Nepal. Uploads are not always "
+    "what they claim to be: some are screenshots, documents, posters, infographics, drawings, memes, indoor photos or "
+    "photos of something unrelated. Describe only what is actually visible and never assume that a lake is there. "
+    "Answer ONLY with a JSON object with keys: "
+    "scene (one of: " + ", ".join(SCENES) + "), "
+    "site_photo (true if this is a real photograph taken outdoors at or near a lake, tank, pond or wetland, its banks, "
+    "its inflow or outflow channels, or the land around it, including buildings or construction on old lake land; "
+    "false for a screenshot, document, poster, infographic, drawing, meme, indoor scene or a photo of something "
+    "unrelated), "
+    "confidence (0 to 1, how sure you are about site_photo), "
+    "categories (array of what is clearly visible, chosen from: dumping, sewage, construction, fencing, weeds, "
+    "dead_fish, foam, dry_bed, healthy; an empty array when site_photo is false or none of them is visible), "
+    "summary (one plain sentence, max 30 words, describing only what is visible, with no guesses about who is "
+    "responsible), "
+    "water_visible (true or false). "
+    "Never identify people or describe their faces.")
+
+
+def _flag(v) -> bool | None:
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, str):
+        return {"true": True, "yes": True, "false": False, "no": False}.get(v.strip().lower())
+    return None
+
+
+def _share(v) -> float | None:
+    """A 0-1 confidence from what the model wrote (a percentage is accepted); None if it is not a number."""
+    if isinstance(v, bool):
+        return None
+    try:
+        c = float(v)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(c) or c < 0:
+        return None
+    return round(min(c / 100 if 1 < c <= 100 else c, 1.0), 2)
 
 
 def triage(jpeg: bytes) -> dict:
-    """AI description of the photo in fixed categories (never a verdict)."""
+    """AI description of the photo: is it a photo of the place, what kind of scene, what is visible (never a verdict)."""
     if C.LOCAL:
         return {"categories": ["other"], "summary": "Local stand-in: deployed builds describe the photo with Amazon Nova.",
-                "waterVisible": None, "confidence": None, "model": "local stand-in"}
+                "waterVisible": None, "confidence": None, "sitePhoto": None, "scene": None, "model": "local stand-in"}
     from .bedrock import converse_image, parse_json
     try:
         text, mid = converse_image(TRIAGE_PROMPT, jpeg, "jpeg", max_tokens=300, temperature=0.0)
         d = parse_json(text) or {}
     except Exception as ex:
         log.warning("vision triage failed: %s", ex)
-        return {"categories": [], "summary": None, "model": None, "error": str(ex)[:200]}
-    cats = [c for c in (d.get("categories") or []) if c in C.EVIDENCE_CATEGORIES][:4]
-    summary = str(d.get("summary") or "")[:240] or None
-    conf = d.get("confidence")
-    return {"categories": cats or ["other"], "summary": summary, "waterVisible": d.get("water_visible"),
-            "confidence": round(float(conf), 2) if isinstance(conf, (int, float)) else None, "model": mid}
+        return {"categories": [], "summary": None, "sitePhoto": None, "scene": None, "model": None,
+                "error": str(ex)[:200]}
+    site = _flag(d.get("site_photo"))
+    cats = [c for c in (d.get("categories") or []) if c in C.EVIDENCE_CATEGORIES and c != "other"][:4]
+    scene = str(d.get("scene") or "").strip().lower()
+    summary = " ".join(str(d.get("summary") or "").split())[:240] or None
+    return {"categories": cats if site is not False else [], "summary": summary,
+            "waterVisible": _flag(d.get("water_visible")), "confidence": _share(d.get("confidence")),
+            "sitePhoto": site, "scene": scene if scene in SCENES else None, "model": mid}
 
 
 def public_copies(data: bytes, face_boxes: list[dict]) -> tuple[bytes, bytes, tuple[int, int]]:
