@@ -1,158 +1,160 @@
 # Demo video script (under 3 minutes)
 
-One person, one week: **Priya is about to rent a ground-floor flat near Bellandur, Bengaluru.** The video follows her
-from the first search to the lake's records, then shows where AWS runs it. It runs to 2:55.
+The video has to cover four things: what the project is, the tech stack and architecture, how it uses AWS, and
+(optionally) what was learned. It does them in that order, and runs to 2:55. One family carries the first half:
+**Priya is about to rent a ground-floor flat near Bellandur, Bengaluru.**
 
-Cues in *italics* are what is on screen; the quoted lines are the voice-over. The numbers come from our run on
+Cues in *italics* are what is on screen; the quoted lines are the voice-over. The numbers come from the live site on
 11 October 2026. Read them off the screen when you record and change the voice-over if they differ.
+
+| Part the form asks for | Where it is |
+|---|---|
+| About the project | 0:00 to 1:35 |
+| Tech stack and architecture | 1:35 to 2:00 |
+| How AWS is used | 2:00 to 2:32 |
+| Learning and growth | 2:32 to 2:48 |
+| End card ("Made by Ansh Singhal") | 2:48 to 2:55 |
 
 ---
 
-**0:00 to 0:11. The problem**
+## About the project
 
-*Home page. Bengaluru's water memory fades in over the satellite image; drag the year gauge from 1991 to 2025. Blue
-is water still there, amber is water that has gone, red is old lake bed now built over.*
+**0:00 to 0:14. The hook**
 
-> Bengaluru floods where its lakes used to be. Priya is about to rent a ground-floor flat near Bellandur. Before she
-> signs, she asks JalSmriti what the place remembers.
+*Past floods page (`/proof`), scrolled to the Kendriya Vihar row: "22 Nov 2021; 6, 16 and 21-22 Oct 2024", and on
+the right "Strong water memory, 75 of 100" with the verdict "Think twice". Then scroll up to the three bars.*
 
-**0:11 to 0:33. What the place remembers**
+> In October 2024, 600 families were evacuated from Kendriya Vihar in Bengaluru, its third flood in a month. It had
+> flooded in 2021 too. The satellite record already said that this ground remembers water. JalSmriti puts that record
+> in front of people before they sign.
 
-*Under "What brings you here?" click "I'm renting or buying a home", then the chip "Bellandur, Bengaluru". The place
-page: the gauge "Strong water memory, 79 of 100", the three findings (6.3 ha of old water-body beds built over within
-2 km, a bowl up to 2.2 m deep, ground less than 1 m above a drainage line), scrub the time-lapse from 1990 to 2025,
-then the radar line.*
+**0:14 to 0:42. What the place remembers, and our read**
 
-> JalSmriti reads forty years of Landsat and Sentinel images, the terrain and every monsoon radar pass for this spot.
-> Strong water memory: old lake beds built over nearby, a bowl in the ground, land less than a metre above a drain.
-> Radar saw no unusual standing water here since 2017, but radar cannot see between tall buildings, and the page says
-> so.
+*Home page: "What brings you here?" → "I'm renting or buying a home" → chip "Bellandur, Bengaluru". The place page:
+the gauge "Strong water memory, 79 of 100" and the three findings. Then "Our read": the answers start at Renting,
+Ground, No, No and the verdict shows "Think twice". Tap "3rd or above": it changes to "Fine, with checks". Tap
+"Ground" again and then "Buying": it changes to "Look elsewhere". Hover over Why, In its favour, Against it and "If
+you still like it".*
 
-**0:33 to 0:53. What to do this week**
+> Priya checks the street. JalSmriti reads forty years of Landsat and Sentinel images, the terrain and every monsoon
+> radar pass: strong water memory, old lake beds built over nearby, ground less than a metre above a drain. Then four
+> taps: renting or buying, which floor, a car in the basement, elderly people or children at home. For a ground-floor
+> flat our read is: think twice. On the third floor: fine, with checks. Buying on the ground floor: look elsewhere.
+> Every verdict says why, what is for and against it, and what to do if she still likes the flat.
 
-*Scroll to "What to do this week", "Renting or buying" selected. Point at the first, second and fourth steps; tick the
-first. Then a four-second cut: the chip "Yamuna Bazar, Delhi", its step "Radar saw standing water near here on
-25 Sep 2026, 17 Sep 2026, 20 Aug 2026. Ask about those days in particular." Back to Bellandur.*
+**0:42 to 0:54. Signed, shared, heard**
 
-> Then the record becomes this week's steps for a renter: ask the owner and two neighbours about the last three
-> monsoons, take the first floor, check the survey number against the lake's full tank level. Where radar did see
-> water, as in Delhi's Yamuna Bazar, the dates become questions.
+*"Signed report (PDF)" → "Download PDF": page one with the "Our read" panel. "Check the signature": "The signature is
+valid." Then "Share on WhatsApp" for a second, and two seconds of "Listen" in Hindi.*
 
-**0:53 to 1:11. A signed report, checked in the browser**
+> The verdict goes into a PDF signed with a key that never leaves AWS KMS, so anyone can check it. She shares it on
+> WhatsApp, and her mother listens to it in Hindi.
 
-*Switch the language to ಕನ್ನಡ (the buttons below are now in Kannada). Click "Signed report (PDF)", then "Download
-PDF": show the two pages for a second.
-Click "Check the signature": "The signature is valid." Drop the PDF on the page: "This PDF is the signed original."
-Drop the copy with one byte changed: "This PDF is not the signed original: its fingerprint is different."*
+**0:54 to 1:16. The lake behind the flooding**
 
-> She downloads the report in Kannada for the owner. It is signed with a key that never leaves AWS KMS, and anyone can
-> check it in their own browser. Change one byte, and the check fails.
+*Explore lakes → Bengaluru → Bellandur Lake: grade D. Scroll to "Why it is like this": the cause list (covered by
+plants, less water reaches it, choked by weeds and algae, built on its bed), each with "Rests on". Then "What would
+help": the residents' buttons and the asks for the authorities. Then "In the news" with its tags.*
 
-**1:11 to 1:21. Share and listen**
+> Bellandur Lake itself: grade D. The page reads why it is like this, from its own record: floating weeds over most of
+> the water, a sign of sewage; less water reaching it than in years of similar rain. Each cause says what it rests on.
+> Then what would help: what residents can do, and what to ask the authorities for, with recent news naming the lake.
 
-*Back on the place page, in English, in the second tab that shows it at phone size (Chrome's device toolbar, 390 ×
-844): the same page, one column, large buttons. Tap "Share on WhatsApp" and show the prepared message for a second.
-Then "Listen", "हिन्दी": let three seconds of the Hindi narration play.*
+**1:16 to 1:26. A random photo is refused**
 
-> On her phone, she shares it with her family on WhatsApp. Her mother would rather listen: Amazon Polly reads it in
-> Hindi.
+*"Add a photo" → choose a screenshot of a news article. After a few seconds: "This does not look like a photo of the
+lake. We read many printed words in it, so it looks like a screenshot, a document or a poster." and "Amazon Nova saw:
+...".*
 
-**1:21 to 1:40. A heads-up before heavy rain**
+> Evidence has to be evidence. A screenshot is refused: Rekognition reads its printed words, and Amazon Nova is asked
+> whether this is a real photo taken at the lake. Real photos go to a verifier and into the lake's tamper-evident
+> record.
 
-*The panel "Rain in the next three days" with its three bars. Click "Follow this place", sign in as Priya (the
-account made before recording): "Heads-ups on". Open My activity, "Send me a test email". Cut to the inbox: the email "Test: Rain heads-up for
-Bellandur, Bengaluru ...", scroll through the amount, the rule for this place, "Before the rain" and the line about
-official warnings.*
+**1:26 to 1:35. Would it have helped?**
 
-> Then she follows the place. Every morning, EventBridge Scheduler runs a Lambda function that checks the forecast for
-> every followed place, with lower thresholds where the ground remembers water, and emails a heads-up through her own
-> SNS topic. Here is the test email.
+*Back on the Past floods page: the three bars. Point at "88% warned", "82% warned" and "53% warned".*
 
-**1:40 to 1:52. Lost lakes, hotter streets**
+> We ran sixteen places that flooded between 2020 and 2026. For a ground-floor renter, our read says think twice or
+> look elsewhere at fourteen of them. And honestly: it also warns at about half of ordinary places. It is a prompt to
+> check, not a ban.
 
-*Scroll to "Summer heat": the heat map with the 300 m ring, then the numbers: here 41.1 °C, built-up nearby 40.4 °C,
-lake water nearby 31.8 °C, under trees 37.4 °C.*
+## Tech stack and architecture
 
-> Lost lakes also make streets hotter. On summer mornings, Landsat measures the ground here at 41 degrees, 9 degrees
-> hotter than the lake water nearby.
+**1:35 to 2:00**
 
-**1:52 to 2:15. The lake itself**
+*The architecture diagram (docs/images/architecture.png, or the Eraser canvas) full screen; slowly move from the
+browser on the left to CloudFront and the API, the photo pipeline, the Step Functions workflows, the jobs box and the
+open data on the right. Then two seconds of the tech-stack diagram.*
 
-*Explore lakes, Bengaluru, open Bellandur Lake: "D", 42 of 100; the findings (a third of its water spread lost since
-1984, 89.4% of the surface under floating weeds on 4 October 2026). Click "Ask for the records (RTI)": the draft
-letter to the Public Information Officer, "Copy the text". Under "Already filed it?" pick the date and "Record it":
-"Recorded in the lake's ledger. A reply is due by ...". Scroll to "Record of changes": the new entry "rti" at the
-top and "The chain is intact."*
+> The website is React and TypeScript in seven languages. Behind it is one AWS SAM stack: CloudFront, API Gateway with
+> Cognito, five Lambda functions in Python, Step Functions for the satellite work, DynamoDB, and the open archives
+> read in place from the Registry of Open Data on AWS and Planetary Computer, never copied. Access rules are written in
+> Cedar, the letter agent runs on Strands Agents, and the API on Powertools.
 
-> The lake itself, Bellandur: grade D. A third of its water spread is gone since 1984, and in October most of its
-> surface was under weeds. JalSmriti drafts a Right to Information request for its records. Once it is filed and
-> recorded, the date a reply is due sits in the lake's tamper-evident ledger.
+## How AWS is used
 
-**2:15 to 2:25. Officials answer on the record**
+**2:00 to 2:32**
 
-*Sign in as the officer. Review console, Bengaluru, Dossiers: respond "Acknowledged" with a note. Open the Audit log:
-the allowed and denied decisions with the Cedar rule for each.*
+*AWS console, Region Asia Pacific (Sydney), about four seconds each:*
 
-> Officers answer on the record. Who may verify or respond is written in Cedar, and every decision, denials included,
-> is logged with its rule.
-
-**2:25 to 2:45. Where AWS runs it**
-
-*AWS console, about three seconds each:*
-
-1. *Step Functions, `jalsmriti-place`: the graph, with the parallel state "Look" and its four branches Static,
-   Optical, Radar and Heat, then Score (open a finished execution so the branches are green).*
-2. *Step Functions, `jalsmriti-area`: a finished Bengaluru execution, its Distributed Map run "Scenes" with the item
-   counts.*
+1. *Step Functions, `jalsmriti-place`: a finished execution with the parallel state "Look" and its four green
+   branches Static, Optical, Radar and Heat, then Score.*
+2. *Step Functions, `jalsmriti-area`: a Bengaluru execution, its Distributed Map "Scenes" with the item counts.*
 3. *Lambda, Functions: `jalsmriti-api`, `jalsmriti-geo`, `jalsmriti-evidence`, `jalsmriti-jobs`,
    `jalsmriti-alerts`.*
-4. *EventBridge Scheduler, Schedules: `jalsmriti-daily-rain`, `cron(15 6 * * ? *)` in Asia/Kolkata, next to
-   `jalsmriti-weekly-watch`.*
-5. *KMS, Customer managed keys: `alias/jalsmriti-signing`, key spec ECC_NIST_P256, usage Sign and verify.*
-6. *CloudWatch, Dashboards: `jalsmriti`.*
+4. *CloudWatch Logs for `jalsmriti-evidence`: the line with `EvidenceUnrelated` (or DynamoDB, the evidence item with
+   `status: unrelated`, `textWords` and `ai.scene`).*
+5. *KMS, Customer managed keys: `alias/jalsmriti-signing`, ECC_NIST_P256, Sign and verify.*
+6. *EventBridge Scheduler: `jalsmriti-daily-rain` at `cron(15 6 * * ? *)`, Asia/Kolkata.*
+7. *CloudWatch, Dashboards: `jalsmriti`.*
 
-> All of it runs on AWS: Step Functions, with four parallel branches for each place and a Distributed Map for whole
-> cities; five Lambda functions; EventBridge Scheduler for the daily rain check; a KMS key that signs every report;
-> and a CloudWatch dashboard over it all.
+> Each place check is a Step Functions workflow with four parallel branches, and a whole city is a Distributed Map
+> over decades of scenes. Photos go through Rekognition and Amazon Nova on Bedrock before anyone sees them. Reports and
+> dossiers are signed with KMS, Polly reads them aloud, EventBridge Scheduler runs the daily rain check that emails
+> through SNS, and CloudWatch watches it all. One command, deploy.py, builds it in a new account.
 
-**2:45 to 2:55. One command**
+## Learning and growth
 
-*The terminal at the end of `python3 deploy.py`: the PASS lines of the smoke tests and "JalSmriti is live." Then the
-home page in the dark theme.*
+**2:32 to 2:48**
 
-> One command deploys it into a new AWS account, for about one to two dollars a month at demo traffic. Water
-> remembers. Now Priya does too.
+*The terminal at the end of `python3 deploy.py`: the PASS lines and "JalSmriti is live." Then the "Is it the lake at
+all?" paragraph on the How it works page.*
+
+> What I learned: AWS's new sign-up allows one Region, so the deploy now finds it. Lambda's Python 3.12 runtime lacks
+> a library GDAL needs, so the layer carries it. And an AI asked to describe a lake photo will find a lake in an
+> infographic. So JalSmriti asks three independent questions, and states its own error rates.
+
+## End card
+
+**2:48 to 2:55**
+
+*Home page in the dark theme, then the end card: "JalSmriti: water remembers", the site address
+https://d2av4xxvyq12ej.cloudfront.net and "Made by Ansh Singhal".*
+
+> Water remembers. Now Priya does too. JalSmriti, made by Ansh Singhal.
 
 ---
 
 ## Before you record
 
-- Deploy with `python3 deploy.py` and wait until Bengaluru has loaded (`python3 deploy.py --status`). Open the
-  Bellandur place page and the Yamuna Bazar one once before recording (each takes two to four minutes the first time;
-  the smoke tests may already have checked Bellandur), so both open at once on camera.
-- Create an account on the site with an email address you can open (the demo accounts use `example.com` addresses,
-  which cannot receive mail). Confirm the sign-up code, follow Bellandur once and click the link in the
-  "Subscription Confirmation" email from AWS, so the test email arrives. Unfollow again if you want to film the
-  follow.
-- As that account, add a photo to Bellandur Lake, prepare a dossier and record its submission, so the officer has a
-  submitted dossier to answer. Have the officer password ready (`python3 deploy.py --show-passwords`).
-- Recording a photo, a dossier or an RTI filing writes permanent entries to the lake's ledger. Do it on your own demo
-  deployment only.
-- Download the Kannada report once and make a copy with one byte changed, for example
-  `cp report.pdf changed.pdf && printf 'X' | dd of=changed.pdf bs=1 seek=4000 conv=notrunc`.
-- Run `npm run check:i18n` in `web/`: Kannada and Hindi should show 0 missing keys, or the report and the narration
-  fall back to English words. If Kannada is not complete, record the report in Hindi.
-- Open the six AWS console pages in tabs in a second Chrome profile, signed in, so the cuts are quick.
-- In the site's window, open a second tab with the Bellandur place page and switch on Chrome's device toolbar at
-  390 × 844 with touch, for the phone beat at 1:11.
+- Deploy with `python3 deploy.py` and check `python3 deploy.py --status`: all areas ready. Open the Bellandur place
+  page, the Kendriya Vihar row of Past floods and Bellandur Lake once, so they open at once on camera.
+- Clear the site data for the site in the recording browser so "Our read" starts at Renting, Ground, No, No.
+- Have a screenshot of a news article (a PNG or JPEG) ready for the photo beat, and a signed-in account (the demo
+  citizen account works; `python3 deploy.py --show-passwords` prints the password). Uploading a refused photo writes no
+  ledger entry, so it is safe to film on the live site.
+- Download the Bellandur report once beforehand, so the PDF opens quickly on camera.
+- Open the seven AWS console pages in tabs of a second Chrome profile, signed in, in Asia Pacific (Sydney).
+- Open docs/images/architecture.png and docs/images/tech-stack.png in an image viewer at full screen.
 
 ## Recording checklist
 
 - [ ] Chrome at 1440×900, zoom 100%, bookmarks bar and extensions hidden, signed out of the site at the start.
 - [ ] Notifications off; a quiet room for the voice-over (recording it separately and laying it over is fine).
-- [ ] The AWS console is on screen for at least 15 seconds, with service names readable: the rules say the video has
-      to show AWS, not only name it.
-- [ ] Keep it under 3:00 (this script runs to 2:55). Trim the waiting while the report renders.
+- [ ] The AWS console is on screen for at least 25 seconds with the service names readable: the rules say the video
+      has to show AWS, not only name it.
+- [ ] Keep it under 3:00 (this script runs to 2:55). Trim waits while pages load or the PDF renders.
 - [ ] Captions on: upload an `.srt` made from the voice-over above, or correct YouTube's automatic captions.
-- [ ] Upload to YouTube as **Unlisted**, then open the link in a private window to check that it plays signed out.
-- [ ] Put the video link and the live site address in the README and the submission form.
+- [ ] Upload to YouTube as **Unlisted** (or Public), then open the link in a private window to check that it plays
+      signed out.
+- [ ] Put the video link in the README ("Demo video") and in the submission form, with the live site address.

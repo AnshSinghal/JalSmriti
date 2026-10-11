@@ -1,5 +1,7 @@
 # JalSmriti: water remembers
 
+Made by **Ansh Singhal**.
+
 ![JalSmriti: Bengaluru's water memory over a Sentinel-2 image of December 2025](docs/images/landing.jpg)
 
 Indian cities flood where their lakes used to be. JalSmriti reads forty years of open satellite data and tells anyone in
@@ -26,9 +28,16 @@ monsoon and a lake group facing encroachment get no plain answer, and nothing th
 **Who it is for:** someone about to rent or buy a home, a resident who wants to be ready for the monsoon, a lake group,
 and the officers who have to answer them.
 
-**Try it in 2 minutes.** The website is at `https://<your CloudFront address>` (`python3 deploy.py` prints the address
-when it finishes; `python3 deploy.py --status` prints it again). Checking places, downloading reports and listening
-need no account. To follow a place or report standing water, sign in with a demo account (`citizen@example.com`;
+**Before the flood.** We checked 16 places that flooded, or where families lost homes on old lake land, between 2020
+and 2026 (Velachery, the Budameru colonies of Vijayawada, Kendriya Vihar, Yamuna Bazar, the Kathmandu Valley and
+others). All 16 show warning signs in their satellite record. For a family renting a ground-floor flat, JalSmriti's
+read is "think twice" or "look elsewhere" at 14 of them. On the validation set it warns at 82% of 39 flooded
+localities, against 53% of 240 ordinary built-up places. See [docs/case-studies.md](docs/case-studies.md) and the
+site's **Past floods** page.
+
+**Try it in 2 minutes.** The website is live at **https://d2av4xxvyq12ej.cloudfront.net** (deployed in AWS Asia
+Pacific (Sydney); `python3 deploy.py` prints the address of your own deployment and `python3 deploy.py --status`
+prints it again). Checking places, downloading reports and listening need no account. To follow a place or report standing water, sign in with a demo account (`citizen@example.com`;
 `verifier@example.com`, `officer@example.com` and `admin@example.com` open the review console) or create your own with
 any email address you can read. Demo passwords are generated at deploy time and printed by
 `python3 deploy.py --show-passwords`.
@@ -36,14 +45,19 @@ any email address you can read. Demo passwords are generated at deploy time and 
 1. **Check Bellandur.** On the home page choose "I'm renting or buying a home", then the chip "Bellandur, Bengaluru".
    The place page shows strong water memory (79 of 100 in our run): old lake beds built over nearby, a bowl in the
    ground, low land by a drain line. The same page has monsoon radar, summer heat and rain for the next three days.
-2. **Read the steps.** "What to do this week" lists what to ask the owner and neighbours, which floor to prefer and
-   which land records to check before signing. Switch to "Living here" for the resident's list.
+2. **Get our read.** Under "Our read", tap renting or buying, the floor, a car in basement parking, and elderly people
+   or small children at home. The verdict changes as you tap ("Look elsewhere", "Think twice", "Fine, with checks" or
+   "Good to go"), with why, what is in its favour and against it, and what to do if you still like the place.
+   "What to do this week" lists what to ask the owner and neighbours; switch to "Living here" for the resident's list.
 3. **Download the signed report and verify it.** "Signed report (PDF)", then "Download PDF" and "Check the signature":
    your browser checks the AWS KMS signature itself. Drop the PDF on that page; change one byte and the check fails.
 4. **Listen in Hindi.** "Listen", then "हिन्दी": Amazon Polly reads the report and the first three steps aloud.
-5. **Act.** Open "Standing water" in the menu and choose "Report standing water" (a photo, where it is, how deep), or
-   open Bellandur Lake (Explore lakes, Bengaluru) and choose "Ask for the records (RTI)" for a ready Right to
-   Information request.
+5. **Open Bellandur Lake** (Explore lakes, Bengaluru). "Why it is like this" lists the likely causes with the numbers
+   behind each (here weeds and sewage, less water reaching it, a bed overgrown from space); "What would help" says what
+   residents can do and what to ask the authorities for; "In the news" shows recent headlines naming the lake.
+   "Ask for the records (RTI)" drafts a Right to Information request.
+6. **Try a random photo.** "Add a photo" with a screenshot or a poster: it comes back as "This does not look like a
+   photo of the lake", is kept private and never enters the lake's record.
 
 ## What it does
 
@@ -56,9 +70,15 @@ any email address you can read. Demo passwords are generated at deploy time and 
   (what to ask, which floor to prefer, which land records to check, insurance) and for someone who lives there
   (drains, a way out over higher ground, heat, official warnings). Radar dates become questions about those days. The
   home page asks "What brings you here?" and opens the matching list.
-- **Signed place report.** A PDF of one or two pages in the reader's language, for the chosen reader, with this week's
-  steps (and, for someone renting or buying, four questions for the owner or seller), signed with a key held in
-  AWS KMS. Anyone can check it at `/verify/<report id>` in their own browser.
+- **Our read, for renting or buying.** Four quick taps (renting or buying, which floor, a car in basement parking,
+  elderly people or small children at home) turn the record into a clear verdict: "Look elsewhere", "Think twice",
+  "Fine, with checks" or "Good to go", with why (what the water memory means, against the flooded places we tested),
+  what is in its favour, what is against it, and what to do if the family still likes the place: take the first floor,
+  skip basement parking, ask about the floods the area remembers, check the land against the lake's full tank level.
+  Buying adds the legal risk of old lake land. The answers stay on the device and go into the signed report.
+- **Signed place report.** A PDF of one or two pages in the reader's language, for the chosen reader, with our read
+  (for someone renting or buying), this week's steps and four questions for the owner or seller, signed with a key
+  held in AWS KMS. Anyone can check it at `/verify/<report id>` in their own browser.
 - **Listen.** Place and lake reports read aloud in Hindi or English by Amazon Polly (neural voice Kajal).
 - **Rain heads-up.** Follow a place and get an email when heavy rain is forecast there for today or tomorrow. A job
   every morning compares the forecast with the India Meteorological Department's rain categories, with lower
@@ -70,8 +90,18 @@ any email address you can read. Demo passwords are generated at deploy time and 
   Bhadrak (Odisha), Kathmandu Valley and Butwal (Nepal). That is 1,138 water bodies, each graded A to E, with water
   spread after every monsoon since 1987, what replaced lost water, floating weeds and radar maps of recent floods
   (2026 floods in Kerala, Assam, Odisha and Butwal). Any other water body in India or Nepal is analysed on request.
-- **Defend a lake.** Add photos (GPS checked against the lake outline, faces blurred), have an NGO verifier confirm
-  them, and prepare a dossier: a letter drafted by an AI agent from computed facts only, translated into one of 13
+  A water body that no map names is named after what is near it ("Water body near Bellandur Lake", "Water body 1.9 km
+  south of Agara Lake"), never just "unnamed".
+- **Why a lake is like this.** Each lake page reads the likely causes from its record, most serious first, each with
+  its numbers and the data it rests on: built on its bed, filled in or drying out, covered by plants, less water
+  reaching it, choked by weeds and algae, or holding up. Then what would help: what residents can do (each with a
+  button on the page) and what to ask the authorities for; how much monsoon water the lost spread would hold again if
+  restored; recent news naming the lake about floods, encroachment, pollution or restoration (Google News search, with
+  the GDELT Project's open index as a fallback, cached 12 hours); and how the lake is being protected on JalSmriti
+  (photos, verifications, dossiers, RTI requests, watchers, ledger entries).
+- **Defend a lake.** Add photos (GPS checked against the lake outline, faces blurred, and refused when they are not
+  photos of the place at all: Rekognition counts the printed words and reads the labels, and Amazon Nova is asked
+  whether it is a real photo taken at the lake), have an NGO verifier confirm them, and prepare a dossier: a letter drafted by an AI agent from computed facts only, translated into one of 13
   languages of India and Nepal, rendered as a PDF and signed with a key held in AWS KMS. Anyone can verify the
   signature in the browser. Every step goes into the lake's tamper-evident ledger.
 - **Ask for the records.** A Right to Information request for a lake's survey records, encroachments, permits and
@@ -81,6 +111,9 @@ any email address you can read. Demo passwords are generated at deploy time and 
 - **Share.** WhatsApp buttons on place, lake and dossier pages, where neighbourhood groups already talk.
 - **Review console.** Verifiers and officers work in their own areas under 16 written access rules (Cedar). Every
   allowed and denied action is logged with the rule that decided it.
+- **Past floods.** Sixteen places that flooded between 2020 and 2026, what happened and what the records say (with
+  sources), JalSmriti's read of each and the verdict for a family renting there, next to the same verdict on the
+  validation set.
 
 The interface speaks English, Hindi, Kannada, Tamil, Telugu, Malayalam and Nepali, in a light and a dark theme. The
 same site works on phones, tablets and laptops: every page was checked from 320 to 1440 px wide with no sideways
@@ -88,6 +121,8 @@ scrolling, and on touch screens every control is at least 44 px, the size of a f
 
 | | |
 |---|---|
+| ![Our read for a family renting a ground-floor flat at Bellandur: think twice, with why, for, against and what to do](docs/images/our-read.jpg) | ![Why Bellandur Lake is like this, and what would help](docs/images/lake-why.jpg) |
+| ![Before the flood: what our read would have said at 16 places that flooded](docs/images/past-floods.jpg) | ![A screenshot uploaded as lake evidence is refused](docs/images/photo-refused.jpg) |
 | ![Place check, Bellandur: water memory, report, share and listen](docs/images/place-check.jpg) | ![Rain in the next three days, this week's steps and summer heat](docs/images/this-week.jpg) |
 | ![Signed place report in Kannada, both pages](docs/images/place-report.jpg) | ![The same report checked in the browser](docs/images/verify.jpg) |
 | ![Standing water reported by people, last 48 hours](docs/images/standing-water.jpg) | ![Right to Information request for Bellandur Lake](docs/images/rti.jpg) |
@@ -103,17 +138,17 @@ scrolling, and on touch screens every control is at least 44 px, the size of a f
 
 | AWS service | What it does in JalSmriti |
 |---|---|
-| Amazon CloudFront | Serves the website, map layers, PDFs and audio; the only way to reach the API (it adds a stack-unique header that the API checks) |
+| Amazon CloudFront | Serves the website, map layers, PDFs and audio; the only way to reach the API (it adds a stack-unique header that the API checks). While AWS has not yet verified a brand-new account for CloudFront, API Gateway serves the site instead |
 | Amazon S3 | Site bucket for the web app and everything public under `/pub/`; private data bucket for original photos and rasters, uploaded by presigned POST |
 | Amazon API Gateway (HTTP API) | Public `/v1` routes, and `/v1/secure` routes behind a Cognito JWT authorizer |
 | AWS Lambda | Five functions: `api` (Powertools router, Cedar decisions), `geo` (GDAL and rasterio, reads the satellite archives), `evidence` (photo pipeline), `jobs` (dossiers and place reports), `alerts` (daily rain heads-up) |
 | AWS Step Functions | A place check runs four parallel branches (Static, Optical, Radar, Heat), then scores; an area run reads 57 to 77 post-monsoon scenes since 1987 with a Distributed Map; lake on request, the weekly check and the deploy-time preload are workflows too |
 | Amazon DynamoDB | One table: areas, lakes, place checks, jobs, evidence, dossiers, place reports, follows, standing-water reports, RTI records, ledgers, audit log, rate limits and the forecast cache |
 | Amazon Cognito | Accounts, email confirmation, and the verifier, officer and admin groups |
-| Amazon Bedrock (Amazon Nova Lite) | The letter-drafting agent (Strands Agents); descriptions of lake photos; whether a standing-water photo shows water and how deep; Nepali, Assamese and Odia translation |
-| Amazon Translate | Letters in 10 Indian languages, with numbers checked after translation |
-| Amazon Rekognition | Blocks unsafe photos and finds faces to blur, for lake photos and standing-water reports |
-| Amazon Polly | Reads place and lake reports aloud in Hindi or Indian English (neural voice Kajal); each text is synthesized once and cached |
+| Amazon Bedrock (Amazon Nova Lite) | The letter-drafting agent (Strands Agents); whether an upload is a real photo of the lake at all, and what it shows; whether a standing-water photo shows water and how deep; Nepali, Assamese and Odia translation |
+| Amazon Translate | Letters in 10 Indian languages, with numbers checked after translation (on accounts without Translate, such as AWS's new Free Tier, Amazon Nova translates them with the same checks) |
+| Amazon Rekognition | Blocks unsafe photos, finds faces to blur, reads printed words (DetectText) and labels so screenshots, documents and posters are refused, for lake photos and standing-water reports |
+| Amazon Polly | Reads place and lake reports aloud in Hindi or Indian English (neural voice Kajal, or the standard voice Aditi where Kajal is not offered); each text is synthesized once and cached |
 | AWS KMS | An ECC P-256 key signs dossiers and place reports (`ECDSA_SHA_256`); the private key never leaves KMS, and browsers verify with the public key |
 | Amazon SQS | Evidence queue (S3 upload events) and jobs queue (dossiers and place reports), each with a dead-letter queue |
 | Amazon SNS | Email: one topic per watched lake for weekly change alerts, one topic per person (`<project>-user-*`) for rain heads-ups |
@@ -170,9 +205,12 @@ What happens, in about 25 to 40 minutes:
 2. It makes a private Python environment in `.build/venv` (first run only), then builds the two Lambda layers on your
    Mac by downloading pinned Linux wheels for Python 3.12.
 3. It uploads code, layers and workflow definitions to an artifacts bucket and deploys one CloudFormation stack
-   (an AWS SAM template) in `us-west-2`, next to the Sentinel-2 and Landsat archives.
+   (an AWS SAM template) in `us-west-2`, next to the Sentinel-2 and Landsat archives, or in the one Region a new
+   account is allowed (see below).
 4. It uploads the website, creates four demo accounts and starts reading the satellite archive: Bengaluru first
-   (15 to 25 minutes), then the other eight areas, which continue in AWS after the script finishes.
+   (15 to 25 minutes), then the other eight areas, which continue in AWS after the script finishes. On an update it
+   brings stored data up to today's rules instead: water bodies without a name of their own get one, and photos still
+   awaiting review get today's photo checks.
 5. It runs smoke tests against the live site (sign-in, a Cedar allow and a deny, a dossier signed with KMS, a place
    check, the rain forecast, a narration in Hindi and a signed place report in Kannada) and prints the website address
    and the demo passwords.
@@ -184,14 +222,23 @@ What happens, in about 25 to 40 minutes:
 | `python3 deploy.py --show-passwords` | Print the demo account passwords again |
 | `python3 deploy.py --preload` | Start the preload of all areas again and follow it |
 | `python3 deploy.py --web-only` | Upload only the website |
+| `python3 deploy.py --maintain` | Only re-name water bodies and re-check photos awaiting review with today's rules |
 | `python3 deploy.py --region ap-south-1` | Deploy somewhere else (us-west-2 is fastest for imagery) |
+| `python3 deploy.py --website cloudfront` | Put CloudFront in front once AWS has verified a new account (`--website api` serves the site through API Gateway) |
 | `python3 deploy.py --destroy` | Delete everything the script created, including the SNS topics the app made (one per watched lake, one per person who follows places) |
 
 Demo accounts: `citizen@example.com`, `verifier@example.com` (all areas), `officer@example.com` (Bengaluru, Chennai,
 Kochi) and `admin@example.com`. Anyone can also create their own account on the site.
 
-**If something stops the deploy:** brand-new accounts sometimes cannot create a CloudFront distribution until AWS has
-verified them (the script says so; open a case in the Support Center and re-run). New accounts also start with low
+**Brand-new accounts.** Accounts opened with AWS's new sign-up (the AWS Settings and projects experience) may
+create resources in one Region only, chosen from the contact address: `ap-southeast-2` (Sydney) for India. An
+organisation policy (SCP) blocks every other Region, and no IAM permission can lift it, so when you do not pass
+`--region` the script finds the allowed Region and deploys there (imagery reads from us-west-2 are then a little
+slower). On those accounts Amazon Translate comes with the Paid Plan (AWS Settings > Billing > Upgrade); without it,
+Amazon Nova translates the letters. Brand-new accounts also sometimes cannot create a CloudFront distribution until
+AWS has verified them: the script then serves the site through API Gateway straight from the site bucket (over HTTPS,
+no CloudFront) and says so; once AWS Support has verified the account, `python3 deploy.py --website cloudfront` puts
+CloudFront back in front. New accounts also start with low
 Lambda limits (10 concurrent runs, 3008 MB of memory); the template and the preload are sized to work within them,
 only more slowly. Re-running `python3 deploy.py` is always safe.
 
@@ -215,36 +262,29 @@ internet.
 To work on the website: `cd web && npm ci && npm run dev` (port 5173, proxied to the local stack). The built site
 ships in `web/dist`, so deploying does not need Node.
 
-Checks: `pytest backend/tests` (151 tests: API, access rules, ledger, dossiers, signatures, metrics, this week's steps,
-summer heat, rain heads-up and narration, standing-water reports, the place report PDF, deploy script and template,
-cfn-lint), `npm run typecheck` and `npm run check:i18n` in `web/`. The i18n check compares every dictionary with
+Checks: `pytest backend/tests` (API, access rules, ledger, dossiers, signatures, metrics, this week's steps, our
+read for renters and buyers, lake causes and news, photo relevance checks, names for unnamed water bodies, summer heat,
+rain heads-up and narration, standing-water reports, the place report PDF, deploy script and template, cfn-lint), `npm run typecheck` and `npm run check:i18n` in `web/`. The i18n check compares every dictionary with
 English (keys and placeholders) and confirms that the server's copy of the words used in reports, narration and emails
 (`backend/src/jalsmriti/data/ui_strings.json`, written by `npm run export:strings`) is up to date.
 
 ## How it works
 
-```mermaid
-flowchart LR
-  user([Browser]) --> cf[CloudFront]
-  cf -->|site, /pub map layers, PDFs, audio| s3site[(S3 site bucket)]
-  cf -->|/v1| api[API Gateway HTTP API<br/>Cognito JWT]
-  api --> apifn[Lambda: API<br/>Powertools + Cedar]
-  apifn --> ddb[(DynamoDB<br/>single table)]
-  apifn -->|read aloud| polly[Amazon Polly]
-  apifn -->|place check, lake analysis| sfn[Step Functions<br/>place: Static, Optical, Radar, Heat<br/>area: Distributed Map]
-  sfn --> geo[Lambda: geo worker<br/>GDAL / rasterio]
-  geo -->|read in place| open[(Landsat, Sentinel-1/2, JRC, DEM<br/>Earth Search on AWS, Planetary Computer)]
-  geo --> s3site
-  user -->|presigned POST| s3data[(S3 data bucket)]
-  s3data -->|event| sqs1[SQS] --> evfn[Lambda: evidence<br/>Rekognition, Nova]
-  apifn -->|dossier and report jobs| sqs2[SQS] --> jobs[Lambda: jobs<br/>Strands Agents + Nova,<br/>Translate, PDF, KMS sign]
-  sched[EventBridge Scheduler] -->|weekly| sfn
-  sched -->|daily 06:15 IST| alerts[Lambda: alerts]
-  alerts -->|forecast| om[(Open-Meteo)]
-  apifn -->|3-day forecast| om
-  geo -->|lake changed| sns[SNS email<br/>topic per lake, topic per person]
-  alerts --> sns
-```
+![JalSmriti on AWS: architecture](docs/images/architecture.png)
+
+**A place check, end to end.** The API answers at once from the stored check, or starts the place workflow: four
+parallel branches read the open archives (Static, Optical, Radar, Heat), then Score stores the result, and the page,
+our read, the signed PDF, the narration and the rain heads-up all build on that one stored check.
+
+![A place check, end to end](docs/images/place-check-flow.png)
+
+**From a citizen photo to a signed complaint.** Every upload is fingerprinted and checked (GPS against the lake
+outline, unsafe content, faces, printed words, and Nova's look at whether it is the lake at all) before a verifier sees
+it; Cedar decides who may verify, every step is chained into the lake's ledger, and the dossier is signed in KMS.
+
+![From a citizen photo to a signed complaint](docs/images/photo-to-dossier-flow.png)
+
+![Tech stack](docs/images/tech-stack.png)
 
 Each job uses the AWS service built for it (the table above lists them). A place check fans out into four parallel
 Step Functions branches and an area run into a Distributed Map over its scenes; the results are stored once, and the
@@ -267,9 +307,15 @@ floods came from extreme rain and breached lakes. It describes history and terra
 data and script are in [docs/validation-data](docs/validation-data) and
 [backend/scripts/validate_places.py](backend/scripts/validate_places.py).
 
-The newer parts are rules and measurements, not fitted models: the steps follow fixed rules from the stored check,
-the rain thresholds are working values (IMD's heavy-rain line, and lower lines for places with a water memory), and
-summer heat is measured from Landsat, not predicted.
+**Our read** is a fixed set of points from the stored check and the family's answers, not a fitted model (the rules
+are written out in [verdict.py](backend/src/jalsmriti/verdict.py)). For a family renting a ground-floor flat it says
+"think twice" or "look elsewhere" at 82% of the 39 flooded localities and at 53% of the 240 random built-up places;
+"look elsewhere" is three times as common at the flooded ones (15% against 5%). So a warning means "check before you
+sign", not "never live here". The 16 recent cases are in [docs/case-studies.md](docs/case-studies.md).
+
+The other newer parts are rules and measurements too: the steps and a lake's likely causes follow fixed rules from
+the stored record, the rain thresholds are working values (IMD's heavy-rain line, and lower lines for places with a
+water memory), and summer heat is measured from Landsat, not predicted.
 
 ## What it costs
 
@@ -312,7 +358,8 @@ backend/src/handlers/       Lambda handlers: api, geo_worker (area, place, lake,
 backend/scripts/            local area runner, local stack, place validation
 backend/tests/              pytest suite (moto)
 web/                        React + TypeScript + Tailwind + MapLibre; web/dist is the built site
-docs/                       architecture, methods, cost, demo script, blog draft, validation data, screenshots
+docs/                       architecture, methods, cost, demo script, blog draft, case studies, validation data,
+                            diagrams and screenshots
 ```
 
 ## Credits
@@ -322,10 +369,11 @@ Sentinel-1 and Sentinel-2 data processed by ESA, read from Earth Search by Eleme
 AWS and from Microsoft Planetary Computer; Copernicus DEM GLO-30 (© DLR e.V. and © Airbus Defence and Space GmbH,
 provided under COPERNICUS by the European Union and ESA); Impact Observatory, Esri and Microsoft 10 m land cover
 (CC BY 4.0); ESA WorldCover 2021 (CC BY 4.0); NASA POWER; names © OpenStreetMap contributors (ODbL) via Photon, and
-GeoNames (CC BY 4.0). Weather data by [Open-Meteo.com](https://open-meteo.com) (CC BY 4.0; free API for non-commercial
+GeoNames (CC BY 4.0). News headlines found through Google News search and the [GDELT Project](https://www.gdeltproject.org)
+(each article stays on its publisher's site; only headlines, outlets and dates are shown). Weather data by [Open-Meteo.com](https://open-meteo.com) (CC BY 4.0; free API for non-commercial
 use). Rain categories: India Meteorological Department. Heat colour ramp: ColorBrewer RdYlBu by Cynthia A. Brewer
 (Apache License 2.0). Fonts: Anek by Ek Type and Noto by Google (SIL Open Font License). Open-source libraries (GDAL
 and rasterio, NumPy, Pillow, fpdf2, HarfBuzz through uharfbuzz, segno, React, MapLibre GL JS, Tailwind CSS and others)
 are listed with their versions in `backend/requirements/` and `web/package.json`, each under its own licence.
 
-Code: MIT licence, see [LICENSE](LICENSE).
+Made by Ansh Singhal. Code: MIT licence, see [LICENSE](LICENSE).

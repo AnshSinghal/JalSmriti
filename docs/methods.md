@@ -1,8 +1,8 @@
 # Methods and validation
 
-The satellite thresholds below are in `backend/src/jalsmriti/config.py`. The newer features keep theirs at the top of
-their own module (`heat.py`, `forecast.py`, `waterlog.py`, `actions.py`, `speech.py`). The code that applies each rule
-is named in brackets.
+The satellite thresholds below are in `backend/src/jalsmriti/config.py`. The newer features keep theirs in their own
+module (`heat.py`, `forecast.py`, `waterlog.py`, `actions.py`, `speech.py`, `verdict.py`, `insights.py`, `news.py`,
+`evidence.py`, `names.py`). The code that applies each rule is named in brackets.
 
 ## Historic water (`landcover.py`, `lakes.py`)
 
@@ -79,6 +79,71 @@ two match). If the lake was nearly dry in those years too, there is no ratio.
 **Storage lost** is the lost spread times 1 to 2 m (1 ha × 1 m = 10 million litres), shown as a range because depth is
 not measured.
 
+## Why a lake is like this (`insights.py`)
+
+Each lake page lists the likely causes of the lake's state. Fixed rules read them from the stored lake metrics each
+time the lake is read (`GET /v1/lakes/<id>` returns them as `insights`); nothing extra is stored and no AI is involved.
+Each cause carries its numbers and says what it rests on. These are readings of satellite data, not findings about
+anyone: a site visit or the official records settle them.
+
+| Cause | Shown when | High (else medium) when |
+|---|---|---|
+| Built on its bed | 0.3 ha or more of the old bed is built-up (the larger of the persistent built-over bed and the lost water now classed built-up) | 10% or more of the historic spread, or 5 ha or more |
+| Filled in or drying out | 0.5 ha or more lost, of which 0.5 ha or more is now bare ground | 25% or more lost, and bare ground is 30% or more of the loss |
+| Covered by plants | 0.5 ha or more lost, of which 0.5 ha or more is now trees, flooded vegetation, rangeland or crops | 25% or more lost |
+| Less water reaches it | retention below 0.8 | retention below 0.5 |
+| Choked by weeds and algae | floating weeds on 20% or more of the water surface (open water and weeds) in the latest look, or an algal sign (mean NDCI over open water above 0.1) | weeds on 50% or more |
+| Holding up | none of the above | always low |
+
+- **Order:** high causes first, then medium.
+- **Details:** "Built on its bed" adds the first land-cover year (2017 to 2023) with 0.3 ha or more built-up on the
+  bed. "Covered by plants" says the cover is most likely water hidden under floating weeds when weeds cover 40% or more
+  of the water surface, because land-cover maps often call a thick mat of water hyacinth crops. "Less water reaches it"
+  names the latest compared season and its water spread against that of the comparable years.
+- **What residents can do:** photograph what they see, ask for the records (RTI), watch the lake, send a signed dossier
+  and join or start a lake group, always; check before renting or buying nearby (built on, or filled in); walk the
+  inflow channels after rain (filled in, plants, or less water); report sewage (weeds and algae). Photo, RTI, watch,
+  dossier and "Check a home here" have buttons on the page.
+- **What to ask the authorities for**, in this order: survey and mark the full boundary and buffer zone (built on,
+  filled in or plants); remove buildings on the bed and stop new approvals in the buffer (built on); clear and reconnect
+  the inflow channels and desilt the bed (filled in, plants or less water); stop debris dumping (filled in); stop sewage
+  entering, and remove the floating weeds regularly (weeds and algae); clear scrub and stop cultivation on the bed
+  (plants, without weeds and algae); keep the lake on the record (always). The page names the area's first two
+  authorities that are not courts.
+- **What protecting it brings back:** when 0.5 ha or more was lost, the storage lost (above) in million litres and in
+  Olympic pools of 2.5 million litres.
+
+## Names for unnamed water bodies (`names.py`, `handlers/area.py`)
+
+- **Own names:** an OpenStreetMap name from the Photon geocoder within a reach of 60 m × √(area in ha), at least 250 m
+  and at most 1,500 m, for a feature tagged as water or with a water word in its name (lake, kere, tank, cheruvu,
+  kunta, talab, sagar, pokhari, pond, kulam, beel, reservoir and others); else a GeoNames name (bundled for India and
+  Nepal) within the same reach. An area run looks up lakes only, not river stretches, and a GeoNames name within 400 m
+  of a lake also counts as its own.
+- **Named after what is near it** (`fallback_name`), first match wins:
+  1. the nearest named lake within 2 km: "Water body near Bellandur Lake" within 1 km, else "Water body 1.5 km east of
+     Bellandur Lake" (distance to 0.1 km and one of eight compass points, seen from the lake);
+  2. the locality (or city) the geocoder gave for the water body's own position: "Water body near Haralur";
+  3. the nearest named lake within 6 km, worded as in 1;
+  4. the locality the geocoder gave for the nearest other water body within 3 km: "Water body in Yelahanka";
+  5. the area: "Water body in Bengaluru".
+
+  Only when none applies is it "Unnamed water body". A river stretch is a "River stretch", not a "Water body".
+- **Named lakes** used above: the area's water bodies with names of their own, plus GeoNames water bodies within 0.06°
+  (about 6.6 km) of the area's box, unless a named water body lies within 1 km of one or has the same name (often the
+  same lake spelt differently: GeoNames "Belandur Tank" is OpenStreetMap's "Bellandur Lake").
+- **Repeated names** (`distinct`): when two or more water bodies get the same name, each one with a named lake within
+  6 km is told apart by its side of that lake: "Water body north of Bellandur Lake" within 1 km, else "Water body
+  4.0 km south-west of Varthur Lake". Names that are still the same stay so.
+- **Stored:** the name and its source (`nameSource`: OpenStreetMap, GeoNames, nearby-lake, nearby-place, area or
+  none). Only lakes named by OpenStreetMap or GeoNames get a news search.
+- **Lakes on request** (`handlers/lake.py`): the same order, with a GeoNames name within 500 m counting as the lake's
+  own and GeoNames lakes around the point as the named lakes. There are no neighbours, so step 4 and the repeat check do
+  not apply.
+- **Re-naming:** the geo function's task `area.rename` names an area's water bodies again with these rules from the
+  stored names, without reading imagery, and updates the list rows, the lake records and the public `lakes.geojson`
+  in place. `deploy.py` runs it for every loaded area after an update.
+
 ## Water memory of a place (`placecheck.py`, `metrics.water_memory_index`)
 
 Five signals around the point:
@@ -121,8 +186,27 @@ floodplain (Delhi), and weak where floods come from extreme rain over wide areas
 Hyderabad). Locality centres are not the exact flooded streets, the reference places are random rather than verified
 dry, and the sample is small. The site presents the index as history and terrain, never as a flood forecast.
 
-The features below are rules and measurements built on the place check. None of them was fitted to outcomes, and none
-has been validated against flood or heat records the way the index has.
+**Our read on the same places.** The same 39 flooded localities and 240 random built-up places, read for a family
+renting a ground-floor flat (rules under "Our read for renters and buyers" below). Radar is left out, so this rests on
+satellite history and terrain alone.
+
+| Our read | Flooded (39) | Random built-up (240) |
+|---|---|---|
+| Look elsewhere | 6 | 12 |
+| Think twice | 26 | 114 |
+| Fine, with checks | 6 | 52 |
+| Good to go | 1 | 62 |
+| Warned (Look elsewhere or Think twice) | 32 (82%) | 126 (53%) |
+
+It warns about 1.6 times as often at the flooded places, and "Look elsewhere" is three times as common there (15%
+against 5%). It also warns at about half of ordinary built-up places, so a warning means "check before you sign", not
+"never live here". The points are fixed rules, not fitted to these places. The 16 recent cases in
+[case studies](case-studies.md) read 13 "Think twice", 1 "Look elsewhere" and 2 "Fine, with checks" for a family renting
+a ground-floor flat, and 11 "Look elsewhere" and 5 "Think twice" for a buyer of a ground-floor flat with a car in
+basement parking.
+
+The features below are rules and measurements built on the place check. None of them was fitted to outcomes. Apart
+from our read, checked above, none has been validated against flood or heat records the way the index has.
 
 ## Summer heat (`heat.py`, `handlers/place.py`)
 
@@ -216,12 +300,61 @@ has been validated against flood or heat records the way the index has.
 - **AI look:** Amazon Nova Lite answers in JSON: whether standing water is visible (a merely wet surface, or water
   within the banks of a lake, river, canal or drain, does not count), the depth (none; ankle, up to about 15 cm; knee,
   up to about 50 cm; waist, up to about 1 m; vehicle, deeper), one plain sentence of at most 30 words and a confidence
-  from 0 to 1. When Nova says "no water" with a confidence of 0.6 or more, the report waits for a verifier; every
-  other report goes on the map at once. The look is a hint for verifiers, never a verdict.
+  from 0 to 1. When Amazon Rekognition reads 25 or more printed words in the photo (a screenshot or document, not a
+  street: `hiddenReason` "text"), or Nova says "no water" with a confidence of 0.6 or more (`hiddenReason`
+  "no-water"), the report waits for a verifier; every other report goes on the map at once. The look is a hint for
+  verifiers, never a verdict.
 - **Review:** verifiers (and admins) in the report's area confirm or reject it with a note of at least 10 characters
   (`verifiers-review-water-reports`); nobody reviews their own report (`no-self-review-of-water-reports`).
 - **Map:** live and verified reports seen in the last 48 hours or 7 days, at most 500.
 - **Place page and place report:** live and verified reports within 1 km in the last 365 days.
+
+## Is a photo of the place at all? (`evidence.py`, `handlers/evidence_ingest.py`)
+
+Uploads are not always what they claim to be: some are screenshots, documents, posters or indoor photos. After the
+moderation check, and before faces are blurred or anything is published, three independent signals are read for every
+lake photo:
+
+- **Printed words:** Amazon Rekognition DetectText, counting the words it reads with 80% confidence or more (it reads
+  at most 100). If the call fails, the other two signals decide.
+- **Labels:** Rekognition labels (at most 25, asked from 65%) that it is 70% or more sure of, in three sets: made
+  images (Text, Document, Poster, Page, Screenshot, Chart, Drawing, Cartoon, Illustration, Screen, Mobile Phone and
+  others), outdoor scenes (Outdoors, Nature, Water, Lake, Grass, Tree, Sky, Road, Street, Building, Construction,
+  Rubble, Garbage, Bird and others) and water (Water, Lake, Pond, River, Shoreline, Waterfront, Wetland, Swamp, Marsh,
+  Puddle, Flood, Canal, Reservoir).
+- **Amazon Nova:** the prompt says uploads are not always what they claim and that Nova must never assume a lake is
+  there. Besides the categories, the summary and whether water is visible, it asks for `scene` (lake or pond, wetland
+  or marsh, dry lake bed, river or canal, drain or outlet, street or buildings, construction site, indoor, screenshot
+  or document, poster or graphic, other), `site_photo` (a real photograph taken outdoors at or near a lake, tank, pond
+  or wetland, its banks, its channels or the land around it, including building on old lake land) and `confidence`
+  (0 to 1, about `site_photo`). When `site_photo` is false, the categories are left empty.
+
+The rule (`relevance`), first match wins:
+
+| Reason | When |
+|---|---|
+| `text` | 25 or more printed words, and no outdoor-scene label |
+| `graphic` | a made-image label, no outdoor-scene label, and Nova did not say it is a site photo |
+| from Nova's scene: `indoor`, `text` (screenshot or document), `graphic` (poster or graphic), else `other` | Nova says it is not a site photo with a confidence of 0.6 or more, and Rekognition sees no water |
+
+Any other photo goes on as before: faces blurred, a public copy, a ledger entry and a verifier. Rekognition's signals
+come first because they cannot be talked into seeing a lake. Many printed words refuse a photo only when Rekognition
+sees no outdoor scene, so a notice board photographed at the lake is not refused for its words. When Nova says no but
+Rekognition sees water, a person decides.
+
+- **Unrelated:** the status becomes `unrelated` with the reason; the word count, the labels and Nova's answer are kept,
+  and an `EvidenceUnrelated` entry goes to the area's audit log. The photo gets no public copy and no ledger entry,
+  never appears on the lake's page or in the verifiers' queue, and cannot be reviewed. The uploader sees "This does not
+  look like a photo of the lake" with the reason.
+- **Standing-water reports:** 25 or more printed words keep a report hidden until a verifier looks (above).
+- **Re-check** (`recheck`): lake photos still awaiting review that were checked before this rule existed (no word
+  count stored), up to 300 per area queue, get today's three signals. One that passes keeps its place and gets the
+  newer AI description. One that fails is already in its lake's ledger, so it is withdrawn on the record: a review
+  entry by "Automatic photo check" (decision `unrelated`, with the reason and Nova's summary) is appended to the ledger,
+  the public copy and its thumbnail are deleted, the lake's photo count drops by one, the status becomes `unrelated`
+  and an `EvidenceUnrelated` audit entry is written. The evidence function runs it when invoked directly with
+  `{"maintenance": "recheck-evidence"}`. `deploy.py` does that after an update (or with `--maintain`) and then
+  invalidates `/pub/evidence/*` in CloudFront if any photo was withdrawn.
 
 ## This week's steps (`actions.py`)
 
@@ -270,22 +403,100 @@ steps stay at the end (report and follow for renting or buying; report for livin
 report and the narration (its first three steps) all use these lists, written from the same dictionary keys in the
 reader's language. Ticks on the page stay on the device.
 
+## Our read for renters and buyers (`verdict.py`)
+
+A verdict for someone about to rent or buy a home: "Look elsewhere", "Think twice", "Fine, with checks" or "Good to
+go". Fixed points come from the stored place check, the live and verified standing-water reports within 1 km in the
+last 365 days, and four answers. No AI is involved.
+
+- **Answers:** renting or buying; the home (a ground-floor flat, a flat on the first or second floor, one on the third
+  floor or above, or an independent house); a car in basement parking; elderly people or small children at home. A
+  missing or unknown answer counts as renting a ground-floor flat, with no basement car and no one vulnerable.
+- **Points from the place:**
+
+  | Fact | Points |
+  |---|---|
+  | Water memory | strong 4, some 3, little 0, not known 1 |
+  | This very spot was water in 5% or more of satellite looks, 1984 to 2020 | 3 (4 from 20%) |
+  | Low ground (1.0 m or less above a drainage line within 300 m) or a hollow 1 m or more deep within 300 m | 1, both 2; a hollow of 3 m or more adds 1 |
+  | Old water-body beds built over within 2 km | 1 from 5 ha |
+  | Radar sightings | 2 (3 from three sightings) |
+  | Standing water reported by people within 1 km in the last year | 1 (2 from three reports) |
+
+- **Then the answers:** a first or second floor takes off 2 points, the third floor or above 3, and an independent
+  house adds 1 (the total never goes below 0). Where the place alone scores 3 or more, a car in basement parking adds 2
+  and elderly people or small children add 1. Buying adds 1 where an old lake bed is at or near the spot (water on the
+  spot in 5% of looks or more, 0.3 ha or more of water lost within 300 m, or 5 ha or more of old beds built over within
+  2 km): the legal risk, and a long commitment.
+- **Levels:** "Look elsewhere" from 8 points, "Think twice" 5 to 7, "Fine, with checks" 2 to 4, "Good to go" 1 or
+  less. A place that scores 3 or more on its own is never "Good to go", whatever the floor, because the street, the
+  basement, the power and the water supply still go under: it reads "Fine, with checks". A flat on the third floor or
+  above is never "Look elsewhere", because the family can be stranded but not flooded: it reads "Think twice".
+- **Why:** what the water memory means against the validation set, then the two weightiest lines against the place
+  (for "Good to go", in its favour). The other lines follow under "In its favour" (up to 5) and "Against it" (up to 6),
+  heaviest first; nothing is said twice.
+
+  | Against it | When | Weight |
+  |---|---|---|
+  | The spot was water | 5% or more of looks | 5 (6 from 20%) |
+  | Radar dates (the 3 most recent) | any radar sighting | 5 |
+  | Low ground | 1.0 m or less above a drainage line | 4 |
+  | Legal risk of an old lake bed (in Nepal, also a river bank) | buying, old bed at or near the spot | 4 |
+  | Water lost within 300 m | 0.3 ha or more | 3 |
+  | A hollow | 1 m or more deep | 2 (3 from 3 m) |
+  | Old beds built over within 2 km | 1 ha or more | 2 (3 from 10 ha) |
+  | People's reports within 1 km | one or more | 2 (3 from three) |
+  | Water gets into ground-floor homes first | ground floor or house, place scores 3 or more | 3 |
+  | Basement parking | a basement car, place scores 3 or more | 3 |
+  | Hard to move at night | elderly people or small children, place scores 3 or more | 2 |
+  | Summer heat | ground of 42 °C or more, or 2 °C or more hotter than built-up ground nearby | 1 |
+
+  | In its favour | When | Weight |
+  |---|---|---|
+  | Never water | under 1% of looks on the spot, under 0.3 ha lost within 300 m, and little water memory | 4 |
+  | High ground | 3 m or more above a drainage line | 3 |
+  | Upstairs | first floor or above | 3 where the place scores 3 or more, else 1 |
+  | No hollow | deepest hollow under 0.5 m | 2 |
+  | Renting keeps you free to move | renting, place scores 3 or more | 2 |
+  | Cooler | 1.5 °C or more cooler than built-up ground nearby | 1 |
+  | Few signs | only one of seven warning signs (spot, radar, low ground, hollow, water lost, beds built over, reports), and not strong water memory | 1 |
+
+- **If you still like it** (not for "Good to go"), in this order: take the first floor or above (ground floor or house,
+  place scores 3 or more); avoid basement parking, or move the car before heavy rain (a basement car, place scores 3 or
+  more); ask about the radar dates, else ask the owner and two neighbours about the flood the area remembers
+  (4 December 2023 in Chennai, 13 October 2020 in Hyderabad, otherwise the area's latest mapped flood) or, outside the
+  nine areas, the last three monsoons; when buying on an old bed, check the survey number against the lake's full tank
+  level and buffer in the revenue records (in Nepal, ownership and the distance from rivers and ponds with the
+  municipality); check that the entrance and plinth are at least three steps above the road (ground floor or house,
+  strong or some memory); visit once after heavy rain; plan how to move elderly people or children (when they live
+  there and the place scores 3 or more); take flood insurance and keep documents and electronics off the floor (place
+  scores 3 or more).
+  At most five, then always "Follow this place to get a heads-up before heavy rain."
+- **Where it shows:** on the place page (`web/src/components/place/VerdictCard.tsx`) for someone renting or buying,
+  read again as the answers change (the answers stay on the device); through `GET /v1/places/verdict`, which answers
+  409 before the place is checked; and in the signed place report when the answers are sent. Every line is a dictionary
+  key with variables, worded in the reader's language. A note under it says it is a reading of open satellite records
+  and the family's answers, not a survey, a legal opinion or financial advice.
+
 ## Place report (`placereport.py`, `report_pdf.py`, `handlers/jobs.py`)
 
 - **Request:** from a stored place check, for a reader (renting or buying, or living here) and a language (English,
-  Hindi, Kannada, Tamil, Telugu, Malayalam or Nepali). The report id is `rpt` plus 16 hex characters of a SHA-256 of
-  the place cell, cache version, check time, language and reader, so the same request returns the same signed PDF.
-- **Content:** the water-memory gauge and tier, findings, up to 6 time-lapse frames spread over the seasons, radar
-  sightings (the 6 most recent), summer heat with its map and scale, standing water reported within 1 km in the last
-  year (up to 6 reports), this week's steps as a checklist, four questions for the owner or seller (renting or buying
-  only), four limits, the data sources and a verification block (content fingerprint, signing key fingerprint, the
-  verify address and a QR code).
+  Hindi, Kannada, Tamil, Telugu, Malayalam or Nepali); for renting or buying, optionally with the four answers of our
+  read. The report id is `rpt` plus 16 hex characters of a SHA-256 of the place cell, cache version, check time,
+  language and reader (and the answers, when sent), so the same request returns the same signed PDF.
+- **Content:** the water-memory gauge and tier, our read when the answers were sent (the level and headline on a panel
+  edged in the level's colour, then why, in its favour, against it and the note), findings, up to 6 time-lapse frames
+  spread over the seasons, radar sightings (the 6 most recent), summer heat with its map and scale, standing water
+  reported within 1 km in the last year (up to 6 reports), this week's steps as a checklist, four questions for the
+  owner or seller (renting or buying only), four limits, the data sources and a verification block (content
+  fingerprint, signing key fingerprint, the verify address and a QR code).
 - **Layout:** A4, normally two pages. Three densities are tried and the most comfortable one that does not end on a
   nearly empty page is kept. Indian scripts are set in Noto fonts and shaped with HarfBuzz. In our run the English
   report for Bellandur was two pages, about 120 KB, and rendered in under a second on a laptop.
 - **What is signed:** a canonical JSON payload (the place, the check's time and id, science version, memory index and
-  tier, finding keys and values, radar sightings, heat numbers, frame seasons, the step keys, language, reader and the
-  number of nearby standing-water reports). Its SHA-256 and the PDF's SHA-256 go into an attestation
+  tier, finding keys and values, radar sightings, heat numbers, frame seasons, the step keys, language, reader, the
+  number of nearby standing-water reports and, with answers, the answers and our read's level, points and the keys of
+  its why, in-favour and against lines). Its SHA-256 and the PDF's SHA-256 go into an attestation
   (`reportId`, `kind: "place-report"`, `payloadSha256`, `pdfSha256`, `signedAt`, `keyFingerprint`, `issuer`), whose
   SHA-256 is signed by the KMS key (`ECDSA_SHA_256`, ECC P-256), as for dossiers.
 - **Check:** `/verify/<report id>` verifies the signature in the browser with Web Crypto and hashes the dropped or
@@ -305,6 +516,44 @@ reader's language. Ticks on the page stay on the device.
 - **Cache:** the audio's name is a SHA-256 of voice, engine, language and text; `/pub/speech/<name>.mp3` is written
   once with an immutable cache header and served by CloudFront, so a text is synthesized once however often it is
   played.
+
+## Recent news (`news.py`)
+
+- **Sources, in order:** Google News search (its public RSS feed, `hl=en-IN`, `gl=IN`), over the past 365 days
+  (`when:365d`); then, only when Google News does not answer, the GDELT Project's DOC 2.0 API (free, no key), which
+  searches the last 3 months (its longest window), 50 asked for per query. GDELT answers in 10 seconds or more and
+  often refuses shared cloud addresses, which is why it is the fallback.
+- **Lake** (`GET /v1/lakes/<id>/news`): the lake's name as a phrase with its city's names, for example
+  `"Bellandur Lake" (Bengaluru OR Bangalore)`. Only lakes with a name of their own (OpenStreetMap or GeoNames) of at
+  least 4 characters are searched; a water body named after what is near it gets the answer "none".
+- **Locality** (`GET /v1/news/floods?locality=`): a name of at least 4 characters, cut to 60, searched as a phrase
+  with flood, flooded, flooding, floods, waterlogging, waterlogged, inundated or submerged; only headlines that name
+  the locality are kept.
+- **Headlines:** only http and https links, within the past 365 days. The outlet's name is taken off the end of a
+  Google News headline. The same headline (compared in lower case without spaces or punctuation, first 80 characters)
+  is kept once, newest first, at most 12, each with the headline, link, outlet, date and which source found it. The
+  articles stay on their publishers' sites. A headline is tagged when it contains one of these word parts, in any case;
+  **a headline with no tag is left out**, so a crime story that happens to name the lake is not shown:
+
+  | Tag | Word parts |
+  |---|---|
+  | Flooding | flood, inundat, waterlog, submerg, deluge, cloudburst, downpour, heavy rain, rain fury, overflow, breach |
+  | Encroachment | encroach, land grab, illegal(ly) or unauthorised construction, building, structure, layout (and illegally occupied or filled), demoli, bulldoz, razed, evict, squatter, buffer zone, notice(s) to a developer or builder, built on a lake or tank |
+  | Pollution | sewage, sewer, foam, froth, dead fish, fish kill, fish death, pollut, hyacinth, weed, toxic, effluent, garbage, dumping, debris, fire and blaze (whole words), stink, contaminat, algae, algal |
+  | Restoration | rejuvenat, restor, desilt, revival, revive, clean-up (cleanup, clean up), cleaning, conserv, wetland, makeover, inflow, treatment plant, STP, plantation, bund repair, strengthening or work, beautif |
+
+  The encroachment words are narrow on purpose: they say that land or water is being taken. Building near a lake is
+  not tagged as encroachment (a headline about a company completing a flyover near Bellandur Lake gets no tag and is
+  left out), because the tag must not suggest that anyone named in a headline took the lake's land.
+
+- **GDELT's turn:** GDELT asks for at most one request every 5 seconds. A conditional write on one DynamoDB item (PK
+  `NEWS`, SK `THROTTLE`; it succeeds when there was no call yet or the last one was more than 5.5 s ago) gives one
+  Lambda the turn; a request tries once a second for up to 3 s. Each call to either source times out after 8 s.
+- **Cache:** each answer is kept in an item with PK `NEWS` and SK `<kind>#<query>` (kind `lake` or `floods`, the
+  query in lower case), served for 12 hours and removed by TTL after 14 days. When both sources fail, the last answer
+  is served marked "stale", or "unavailable" when there is none.
+- **On the page:** "In the news" on a lake page shows up to 8 headlines with their tags and the number of headlines per
+  tag.
 
 ## Language and letters
 
@@ -331,8 +580,8 @@ reader's language. Ticks on the page stay on the device.
 ## Site-wide daily caps (`config.RATE_LIMIT_PER_DAY`)
 
 Per address (anonymous) or per account (signed in), per day: 25 place checks, 10 lake analyses, 600 searches,
-300 forecasts, 20 place reports and 30 new narrations per address; 30 photos, 10 dossiers, 30 watches, 20 follows,
-3 test emails, 10 RTI records and 10 standing-water reports per account. For the whole site, set by environment
-variables on the API function: `PLACE_CHECKS_PER_DAY` (200), `LAKE_ANALYSES_PER_DAY` (40), `SEARCHES_PER_DAY` (5000),
-`REPORTS_PER_DAY` (500), `NARRATIONS_PER_DAY` (200, counted only for audio not already cached),
-`WATER_REPORTS_PER_DAY` (1000) and `FORECASTS_PER_DAY` (5000).
+300 forecasts, 120 news requests, 20 place reports and 30 new narrations per address; 30 photos, 10 dossiers,
+30 watches, 20 follows, 3 test emails, 10 RTI records and 10 standing-water reports per account. For the whole site,
+set by environment variables on the API function: `PLACE_CHECKS_PER_DAY` (200), `LAKE_ANALYSES_PER_DAY` (40),
+`SEARCHES_PER_DAY` (5000), `REPORTS_PER_DAY` (500), `NARRATIONS_PER_DAY` (200, counted only for audio not already
+cached), `WATER_REPORTS_PER_DAY` (1000) and `FORECASTS_PER_DAY` (5000).

@@ -1,6 +1,6 @@
 # Water remembers: building JalSmriti on AWS
 
-*Draft for AWS Builder Center. Replace the site link and add your name before publishing.*
+*By Ansh Singhal. Draft for AWS Builder Center.*
 
 When Bengaluru flooded in September 2022, the worst-hit layouts along Sarjapur Road and in Mahadevapura sat on what
 used to be the beds and channels of the city's tanks. Chennai in 2015 and Hyderabad in 2020 told the same story:
@@ -22,13 +22,16 @@ built and what I learned building it on AWS.
   the ground gets on summer mornings, and the rain forecast for the next three days.
 - **What to do this week**: up to seven steps for that place, one list for someone about to rent or buy and one for
   someone who lives there.
+- **Our read**: four quick answers (renting or buying, which floor, a car in basement parking, elderly people or small
+  children at home) turn the check into a plain verdict, from "Look elsewhere" to "Good to go", with the reasons.
 - **A signed place report**: the check and the steps as a PDF in the reader's language, signed with AWS KMS and
   verifiable in any browser; it can also be read aloud in Hindi or English by Amazon Polly.
 - **Rain heads-up**: follow a place and get an email when heavy rain is forecast there.
 - **Report standing water**: a photo on a live map, checked for privacy and by Amazon Nova, confirmed by NGO
   verifiers.
 - **Explore lakes**: nine areas read in full, 1,138 water bodies graded A to E from water held after each monsoon,
-  old bed built over, floating weeds and water lost since 1984.
+  old bed built over, floating weeds and water lost since 1984, each with its likely causes, what would help and recent
+  news that names it.
 - **Defend a lake**: verified photo evidence, an AI-drafted letter in 13 languages of India and Nepal, a PDF signed
   with AWS KMS, a Right to Information request for the lake's records, and a hash-chained ledger of everything that
   happens to the lake.
@@ -123,10 +126,10 @@ and a place gets at most one email a day.
 
 ## Reports people can check, and hear
 
-The place report is a PDF of one or two pages for the chosen reader, in their language. Its id is derived from the
-check, the language and the reader, so asking twice returns the same signed file. The jobs function signs an
-attestation of the content and PDF fingerprints with the same KMS key as the dossiers, and the verify page checks it
-in the visitor's browser.
+The place report is a PDF of one or two pages for the chosen reader, in their language, with our read when a family
+renting or buying has given its four answers. Its id is derived from the check, the language, the reader and those
+answers, so asking twice returns the same signed file. The jobs function signs an attestation of the content and PDF
+fingerprints with the same KMS key as the dossiers, and the verify page checks it in the visitor's browser.
 
 ![A signed place report in Kannada](images/place-report.jpg)
 
@@ -144,7 +147,8 @@ Satellites miss water that drains in hours; people standing in it do not. A stan
 same pipeline as lake photos: a presigned POST to a private bucket, an SQS-triggered Lambda that fingerprints the
 original, screens it with Amazon Rekognition, blurs faces and strips metadata. Amazon Nova then says whether standing
 water is visible and how deep. That answer is a hint: a report goes on the map at once unless Nova is at least 60%
-sure there is no water, and NGO verifiers confirm or reject reports under Cedar rules that forbid reviewing your own.
+sure there is no water or Rekognition reads 25 or more printed words in the photo, and NGO verifiers confirm or reject
+reports under Cedar rules that forbid reviewing your own.
 
 ![Standing water reported by people](images/standing-water.jpg)
 
@@ -175,6 +179,31 @@ due: 30 days in India, 15 in Nepal.
 
 ![A Right to Information request for Bellandur Lake](images/rti.jpg)
 
+## What the recent floods taught me
+
+I went back to 16 places in India and Nepal that flooded between 2020 and 2026, or where families lost homes built on
+old lake land. Among them are Velachery in Chennai after Cyclone Michaung, the Budameru floods in Vijayawada, Kendriya
+Vihar in Bengaluru (flooded in 2021, then again in 2024), and Nakkhu and Balkhu in the Kathmandu Valley. Every one
+shows at least one warning sign. The water history ends in 2020, so a family could have seen those signs before most
+of these floods. That does not prove anyone would have been saved.
+
+A family about to sign needs a plain answer, not a score. So the place page now gives "Our read". Four quick answers
+and fixed points from the stored check give "Look elsewhere", "Think twice", "Fine, with checks" or "Good to go", with
+the reasons and what to do if you still like the place. For a family renting a ground-floor flat, the 16 places read
+13 "Think twice", 1 "Look elsewhere" and 2 "Fine, with checks". For a buyer of a ground-floor flat with a car in
+basement parking, they read 11 "Look elsewhere" and 5 "Think twice". The fair test is the validation set. Our read
+warns at 82% of the 39 flooded localities, but also at 53% of the 240 random built-up places, and "Look elsewhere" is
+three times as common at the flooded ones (15% against 5%). So a warning means "check before you sign", not "never
+live here", and the page says so.
+
+Two smaller changes make the lake record easier to trust and to use. A vision model told that an upload is lake
+evidence can be talked into seeing a lake. Amazon Rekognition's word count and labels cannot, so they now decide
+first, and Nova's own answer on whether it is a real photo taken at the lake counts when Nova is sure. A screenshot,
+poster or indoor photo stays private, with the reason. Photos already waiting for a verifier are re-checked at the
+next deploy; one that fails is withdrawn with a ledger entry that says why. And every water body now has a name. One
+that no map names is called after what is near it, such as "Water body near Bellandur Lake", because nobody writes to
+an office about "Unnamed water body".
+
 ## One command, about a dollar a month
 
 `python3 deploy.py` checks the account (including free-plan credits and the Polly voice), builds the Lambda layers on
@@ -188,7 +217,7 @@ to narrations.
 
 I used Claude (Anthropic) as an AI coding assistant for code, documentation and the interface translations. The
 translations into Hindi, Kannada, Tamil, Telugu, Malayalam and Nepali were machine-drafted and still need review by
-native speakers. What kept the work honest was the test suite (151 tests with moto standing in for AWS) and the rule
+native speakers. What kept the work honest was the test suite (207 tests with moto standing in for AWS) and the rule
 that every number on the site comes from computed facts.
 
 ## What I would do next
@@ -200,4 +229,4 @@ front of the offices that can act on them.
 
 *JalSmriti is open source. Satellite data: JRC Global Surface Water, USGS Landsat, Copernicus Sentinel, Copernicus
 DEM, Impact Observatory, ESA WorldCover, NASA POWER; weather data by Open-Meteo.com; names from OpenStreetMap and
-GeoNames.*
+GeoNames; news headlines found through Google News and the GDELT Project.*
